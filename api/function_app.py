@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import time
 import pyodbc
 import azure.functions as func
 from datetime import datetime, date
@@ -31,7 +32,18 @@ def get_connection():
         f"PWD={os.environ['SQL_PASSWORD']};"
         "Encrypt=yes;TrustServerCertificate=no;Connection Timeout=90;"
     )
-    return pyodbc.connect(conn_str)
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return pyodbc.connect(conn_str)
+        except pyodbc.OperationalError as e:
+            if attempt == max_attempts:
+                raise
+            logging.warning(
+                f"Verbindung fehlgeschlagen (Versuch {attempt}/{max_attempts}), "
+                f"DB evtl. noch am Aufwachen (Serverless Auto-Pause). Warte 20s... ({e})"
+            )
+            time.sleep(20)
 
 
 def check_auth(req: func.HttpRequest) -> bool:
