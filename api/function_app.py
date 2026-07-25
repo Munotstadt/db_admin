@@ -59,6 +59,41 @@ def unauthorized():
     return json_response({"error": "Unauthorized"}, status_code=401)
 
 
+REFERENCE_LABEL_COLUMN = {
+    "security_master": "Name",
+    "security_parameter_types": "ParameterName",
+}
+
+
+def get_foreign_keys(conn, table):
+    """Liefert {FK-Spalte: (Ref-Tabelle, Ref-Spalte)} fuer eine Tabelle."""
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT fkc.COLUMN_NAME AS FKColumn, pkt.TABLE_NAME AS RefTable, pkc.COLUMN_NAME AS RefColumn
+        FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+        JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE fkc
+          ON rc.CONSTRAINT_NAME = fkc.CONSTRAINT_NAME AND rc.CONSTRAINT_SCHEMA = fkc.CONSTRAINT_SCHEMA
+        JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS pkt
+          ON rc.UNIQUE_CONSTRAINT_NAME = pkt.CONSTRAINT_NAME AND rc.UNIQUE_CONSTRAINT_SCHEMA = pkt.CONSTRAINT_SCHEMA
+        JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE pkc
+          ON pkt.CONSTRAINT_NAME = pkc.CONSTRAINT_NAME
+        WHERE fkc.TABLE_NAME = ?
+        """,
+        table,
+    )
+    return {r.FKColumn: (r.RefTable, r.RefColumn) for r in cursor.fetchall()}
+
+
+def get_lookup_options(conn, ref_table, ref_column, label_column):
+    cursor = conn.cursor()
+    cursor.execute(
+        f"SELECT TOP 2000 [{ref_column}] AS val, [{label_column}] AS label "
+        f"FROM [{ref_table}] ORDER BY [{label_column}]"
+    )
+    return [{"value": r.val, "label": r.label} for r in cursor.fetchall()]
+
+
 def is_valid_table(conn, table):
     if not VALID_TABLE_NAME.match(table or ""):
         return False
@@ -139,6 +174,18 @@ def get_table(req: func.HttpRequest) -> func.HttpResponse:
 
         pk = get_primary_key(conn, table)
 
+        fks = get_foreign_keys(conn, table)
+        lookups = {}
+        for col in columns:
+            ref = fks.get(col["name"])
+            if ref:
+                ref_table, ref_column = ref
+                label_col = REFERENCE_LABEL_COLUMN.get(ref_table)
+                if label_col:
+                    col["linkedTable"] = ref_table
+                    col["linkedLabelColumn"] = label_col
+                    lookups[col["name"]] = get_lookup_options(conn, ref_table, ref_column, label_col)
+
         if search:
             where_clause = " OR ".join(f"CAST([{c}] AS NVARCHAR(MAX)) LIKE ?" for c in col_names)
             search_params = [f"%{search}%"] * len(col_names)
@@ -165,6 +212,7 @@ def get_table(req: func.HttpRequest) -> func.HttpResponse:
             "total": total,
             "limit": limit,
             "offset": offset,
+            "lookups": lookups,
         })
     except Exception as e:
         logging.error(str(e))
@@ -208,18 +256,34 @@ def update_row(req: func.HttpRequest) -> func.HttpResponse:
         body = req.get_json()
         pk_column = body["pkColumn"]
         pk_value = body["pkValue"]
-        updates = body["updates"]
-        if not updates:
-            return json_response({"error": "No updates provided"}, status_code=400)
+        updates = dict(body["updates"])
 
         conn = get_connection()
         if not is_valid_table(conn, table):
             return json_response({"error": "Invalid table"}, status_code=400)
 
-        set_clause = ", ".join(f"[{c}] = ?" for c in updates.keys())
-        values = list(updates.values()) + [pk_value]
-
         cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?", table
+        )
+        all_columns = {r[0] for r in cursor.fetchall()}
+
+        # Modified_at/Created_at nie vom Client uebernehmen - immer serverseitig setzen bzw. unangetastet lassen
+        updates.pop("Modified_at", None)
+        updates.pop("Created_at", None)
+
+        set_parts = [f"[{c}] = ?" for c in updates.keys()]
+        values = list(updates.values())
+
+        if "Modified_at" in all_columns:
+            set_parts.append("[Modified_at] = SYSUTCDATETIME()")
+
+        if not set_parts:
+            return json_response({"error": "No updates provided"}, status_code=400)
+
+        set_clause = ", ".join(set_parts)
+        values.append(pk_value)
+
         cursor.execute(f"UPDATE [{table}] SET {set_clause} WHERE [{pk_column}] = ?", values)
         conn.commit()
         conn.close()
