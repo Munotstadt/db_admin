@@ -393,7 +393,7 @@
     const grid = document.getElementById('addGrid');
     addForm.classList.remove('hidden');
     grid.innerHTML = currentColumns
-      .filter(c => c.name !== 'Created_at' && c.name !== 'Modified_at' && !c.isIdentity)
+      .filter(c => c.name !== 'Created_at' && c.name !== 'Modified_at' && c.name !== currentPk && !c.isIdentity)
       .map(c => {
         if (currentLookups[c.name]) {
           const options = currentLookups[c.name];
@@ -464,10 +464,20 @@
   async function addRow() {
     const inputs = document.querySelectorAll('[data-newcol]');
     const body = {};
-    inputs.forEach(inp => {
+    for (const inp of inputs) {
       const col = inp.dataset.newcol;
-      if (inp.value !== '') body[col] = inp.value;
-    });
+      if (inp.value === '') continue;
+      let val = inp.value;
+      if (inp.dataset.datetime === '1') {
+        const parsed = parseChDateTimeToISO(val);
+        if (!parsed) {
+          alert(`Ungültiges Datum/Zeit-Format bei ${col}. Erwartet: TT.MM.JJJJ HH:MM:SS`);
+          return;
+        }
+        val = parsed;
+      }
+      body[col] = val;
+    }
     try {
       await apiFetch(`/tables/${encodeURIComponent(currentTable)}`, {
         method: 'POST',
