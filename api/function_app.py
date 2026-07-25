@@ -113,6 +113,16 @@ def get_table(req: func.HttpRequest) -> func.HttpResponse:
     if not check_auth(req):
         return unauthorized()
     table = req.route_params.get("table")
+    search = req.params.get("search", "").strip()
+    try:
+        limit = min(int(req.params.get("limit", 100)), 500)
+    except ValueError:
+        limit = 100
+    try:
+        offset = max(int(req.params.get("offset", 0)), 0)
+    except ValueError:
+        offset = 0
+
     try:
         conn = get_connection()
         if not is_valid_table(conn, table):
@@ -125,15 +135,37 @@ def get_table(req: func.HttpRequest) -> func.HttpResponse:
             table,
         )
         columns = [{"name": r[0], "type": r[1], "nullable": r[2] == "YES"} for r in cursor.fetchall()]
+        col_names = [c["name"] for c in columns]
 
         pk = get_primary_key(conn, table)
 
-        cursor.execute(f"SELECT TOP 500 * FROM [{table}] ORDER BY [{pk}] DESC")
-        col_names = [c[0] for c in cursor.description]
-        rows = [dict(zip(col_names, row)) for row in cursor.fetchall()]
+        if search:
+            where_clause = " OR ".join(f"CAST([{c}] AS NVARCHAR(MAX)) LIKE ?" for c in col_names)
+            search_params = [f"%{search}%"] * len(col_names)
+        else:
+            where_clause = "1=1"
+            search_params = []
+
+        cursor.execute(f"SELECT COUNT(*) FROM [{table}] WHERE {where_clause}", search_params)
+        total = cursor.fetchone()[0]
+
+        cursor.execute(
+            f"SELECT * FROM [{table}] WHERE {where_clause} "
+            f"ORDER BY [{pk}] DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
+            search_params + [offset, limit],
+        )
+        result_col_names = [c[0] for c in cursor.description]
+        rows = [dict(zip(result_col_names, row)) for row in cursor.fetchall()]
 
         conn.close()
-        return json_response({"columns": columns, "primaryKey": pk, "rows": rows})
+        return json_response({
+            "columns": columns,
+            "primaryKey": pk,
+            "rows": rows,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        })
     except Exception as e:
         logging.error(str(e))
         return json_response({"error": str(e)}, status_code=500)
