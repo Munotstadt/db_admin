@@ -1,3 +1,4 @@
+
 """
 Generische Admin-API für SecuritiesDBtwo.
 Funktioniert fuer beliebige Tabellen (erkennt Spalten & Primaerschluessel
@@ -161,6 +162,9 @@ def get_table(req: func.HttpRequest) -> func.HttpResponse:
         return unauthorized()
     table = req.route_params.get("table")
     search = req.params.get("search", "").strip()
+    order_by_param = req.params.get("orderBy", "")
+    order_dir_param = req.params.get("orderDir", "DESC").upper()
+    order_dir = "ASC" if order_dir_param == "ASC" else "DESC"
     try:
         limit = min(int(req.params.get("limit", 100)), 500)
     except ValueError:
@@ -186,6 +190,9 @@ def get_table(req: func.HttpRequest) -> func.HttpResponse:
 
         pk = get_primary_key(conn, table)
 
+        # order_by nur akzeptieren, wenn es eine echte Spalte der Tabelle ist (SQL-Injection-Schutz)
+        order_by = order_by_param if order_by_param in col_names else pk
+
         fks = get_foreign_keys(conn, table)
         lookups = {}
         for col in columns:
@@ -210,7 +217,7 @@ def get_table(req: func.HttpRequest) -> func.HttpResponse:
 
         cursor.execute(
             f"SELECT * FROM [{table}] WHERE {where_clause} "
-            f"ORDER BY [{pk}] DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
+            f"ORDER BY [{order_by}] {order_dir} OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
             search_params + [offset, limit],
         )
         result_col_names = [c[0] for c in cursor.description]
@@ -225,6 +232,8 @@ def get_table(req: func.HttpRequest) -> func.HttpResponse:
             "limit": limit,
             "offset": offset,
             "lookups": lookups,
+            "orderBy": order_by,
+            "orderDir": order_dir,
         })
     except Exception as e:
         logging.error(str(e))
