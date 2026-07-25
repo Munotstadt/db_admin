@@ -195,6 +195,49 @@
     return m ? m[1] : '';
   }
 
+  function fmtDateTimeInputCH(isoString) {
+    if (!isoString) return '';
+    const s = String(isoString);
+    const iso = s.endsWith('Z') ? s : s + 'Z';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const parts = new Intl.DateTimeFormat('de-CH', {
+      timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }).formatToParts(d);
+    const get = t => parts.find(p => p.type === t).value;
+    return `${get('day')}.${get('month')}.${get('year')} ${get('hour')}:${get('minute')}:${get('second')}`;
+  }
+
+  function nowFormattedCH() {
+    return fmtDateTimeInputCH(new Date().toISOString());
+  }
+
+  function parseChDateTimeToISO(str) {
+    if (!str) return null;
+    const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+    if (!m) return null;
+    const [, dd, mo, yyyy, hh, mi, ss] = m;
+    const y = parseInt(yyyy, 10), mon = parseInt(mo, 10), d = parseInt(dd, 10);
+    const h = parseInt(hh, 10), min = parseInt(mi, 10), sec = ss ? parseInt(ss, 10) : 0;
+
+    // Wall-clock-Zeit in Zuerich -> UTC umrechnen (beruecksichtigt MEZ/MESZ automatisch)
+    const utcGuess = Date.UTC(y, mon - 1, d, h, min, sec);
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Zurich', hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    const parts = fmt.formatToParts(new Date(utcGuess));
+    const get = t => parseInt(parts.find(p => p.type === t).value, 10);
+    const zurichAsIfUTC = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+    const diff = zurichAsIfUTC - utcGuess;
+    const actualUTC = utcGuess - diff;
+    return new Date(actualUTC).toISOString().slice(0, 19);
+  }
+
+  const DATETIME_TYPES = ['datetime2', 'datetime', 'smalldatetime', 'datetimeoffset'];
+
   // Spalten mit Vorschlagsliste (Datalist) - erlaubt trotzdem freien Text
   const DATALIST_COLUMNS = {
     Currency: ['CHF', 'EUR', 'USD', 'GBP', 'JPY'],
@@ -325,6 +368,11 @@
           return `<td><input type="date" data-col="${c.name}" data-row="${idx}" value="${toDateInputValue(rawVal)}" ${isPk ? 'disabled' : ''}></td>`;
         }
 
+        if (DATETIME_TYPES.includes(c.type) && !isAutoField) {
+          const displayVal = fmtDateTimeInputCH(rawVal);
+          return `<td><input type="text" data-col="${c.name}" data-row="${idx}" data-datetime="1" value="${displayVal}" placeholder="TT.MM.JJJJ HH:MM:SS" ${isPk ? 'disabled' : ''}></td>`;
+        }
+
         if (DATALIST_COLUMNS[c.name]) {
           const val = fmtCellValue(rawVal, c.name);
           return `<td><input type="text" list="datalist-${c.name}" data-col="${c.name}" data-row="${idx}" value="${val.replace(/"/g, '&quot;')}" ${isPk ? 'disabled' : ''}></td>`;
@@ -357,6 +405,9 @@
         if (c.type === 'date') {
           return `<label>${c.name}${c.nullable ? '' : ' *'}<input type="date" data-newcol="${c.name}"></label>`;
         }
+        if (DATETIME_TYPES.includes(c.type)) {
+          return `<label>${c.name}${c.nullable ? '' : ' *'}<input type="text" data-newcol="${c.name}" data-datetime="1" value="${nowFormattedCH()}" placeholder="TT.MM.JJJJ HH:MM:SS"></label>`;
+        }
         if (DATALIST_COLUMNS[c.name]) {
           return `<label>${c.name}${c.nullable ? '' : ' *'}<input type="text" list="datalist-${c.name}" data-newcol="${c.name}" placeholder="${c.type}"></label>`;
         }
@@ -369,11 +420,20 @@
   async function saveRow(idx) {
     const inputs = document.querySelectorAll(`[data-row="${idx}"]`);
     const updates = {};
-    inputs.forEach(inp => {
+    for (const inp of inputs) {
       const col = inp.dataset.col;
-      if (col === currentPk) return;
-      updates[col] = inp.value === '' ? null : inp.value;
-    });
+      if (col === currentPk) continue;
+      let val = inp.value === '' ? null : inp.value;
+      if (inp.dataset.datetime === '1' && val) {
+        const parsed = parseChDateTimeToISO(val);
+        if (!parsed) {
+          alert(`Ungültiges Datum/Zeit-Format bei ${col}. Erwartet: TT.MM.JJJJ HH:MM:SS`);
+          return;
+        }
+        val = parsed;
+      }
+      updates[col] = val;
+    }
     const pkValue = currentRows[idx][currentPk];
     try {
       await apiFetch(`/tables/${encodeURIComponent(currentTable)}`, {
