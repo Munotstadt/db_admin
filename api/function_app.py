@@ -1,4 +1,3 @@
-
 """
 Generische Admin-API für SecuritiesDBtwo.
 Funktioniert fuer beliebige Tabellen (erkennt Spalten & Primaerschluessel
@@ -107,6 +106,20 @@ def get_lookup_options(conn, ref_table, ref_column, label_column):
     return [{"value": r.val, "label": r.label} for r in cursor.fetchall()]
 
 
+def get_identity_columns(conn, table):
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT c.name
+        FROM sys.identity_columns c
+        JOIN sys.tables t ON c.object_id = t.object_id
+        WHERE t.name = ?
+        """,
+        table,
+    )
+    return {r[0] for r in cursor.fetchall()}
+
+
 def is_valid_table(conn, table):
     if not VALID_TABLE_NAME.match(table or ""):
         return False
@@ -187,6 +200,10 @@ def get_table(req: func.HttpRequest) -> func.HttpResponse:
         )
         columns = [{"name": r[0], "type": r[1], "nullable": r[2] == "YES"} for r in cursor.fetchall()]
         col_names = [c["name"] for c in columns]
+
+        identity_columns = get_identity_columns(conn, table)
+        for col in columns:
+            col["isIdentity"] = col["name"] in identity_columns
 
         pk = get_primary_key(conn, table)
 
