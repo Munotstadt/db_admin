@@ -149,14 +149,28 @@
     document.getElementById('passwordInput').value = '';
   }
 
-  function fmtCellValue(v) {
+  function fmtDateTimeCH(isoString) {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return String(isoString);
+    const parts = new Intl.DateTimeFormat('de-CH', {
+      timeZone: 'Europe/Zurich',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(d);
+    return parts.replace(',', '');
+  }
+
+  function fmtCellValue(v, columnName) {
     if (v === null || v === undefined) return '';
+    if (columnName === 'Created_at' || columnName === 'Modified_at') return fmtDateTimeCH(v);
     return String(v);
   }
 
   let currentOffset = 0;
   let currentLimit = 100;
   let currentTotal = 0;
+  let currentLookups = {};
   let searchDebounce = null;
 
   async function loadTable(table, resetOffset = true) {
@@ -175,6 +189,7 @@
       currentPk = data.primaryKey;
       currentRows = data.rows;
       currentTotal = data.total;
+      currentLookups = data.lookups || {};
       renderTable(currentRows);
       renderAddForm();
 
@@ -204,8 +219,19 @@
     body.innerHTML = rowsToRender.map((row, idx) => {
       const cells = currentColumns.map(c => {
         const isPk = c.name === currentPk;
-        const val = fmtCellValue(row[c.name]);
-        return `<td><input type="text" data-col="${c.name}" data-row="${idx}" value="${val.replace(/"/g, '&quot;')}" ${isPk ? 'disabled' : ''}></td>`;
+        const isAutoField = c.name === 'Modified_at' || c.name === 'Created_at';
+        const rawVal = row[c.name];
+
+        if (currentLookups[c.name]) {
+          const options = currentLookups[c.name];
+          const optHtml = ['<option value="">—</option>'].concat(
+            options.map(o => `<option value="${o.value}" ${String(o.value) === String(rawVal) ? 'selected' : ''}>${o.value} – ${o.label}</option>`)
+          ).join('');
+          return `<td><select data-col="${c.name}" data-row="${idx}" ${isPk ? 'disabled' : ''}>${optHtml}</select></td>`;
+        }
+
+        const val = fmtCellValue(rawVal, c.name);
+        return `<td><input type="text" data-col="${c.name}" data-row="${idx}" value="${val.replace(/"/g, '&quot;')}" ${(isPk || isAutoField) ? 'disabled' : ''}></td>`;
       }).join('');
       return `<tr>${cells}<td class="row-actions">
         <button onclick="saveRow(${idx})">Speichern</button>
@@ -218,14 +244,24 @@
     const addForm = document.getElementById('addForm');
     const grid = document.getElementById('addGrid');
     addForm.classList.remove('hidden');
-    grid.innerHTML = currentColumns.map(c => `
-      <label>${c.name}${c.nullable ? '' : ' *'}
-        <input type="text" data-newcol="${c.name}" placeholder="${c.type}">
-      </label>`).join('');
+    grid.innerHTML = currentColumns
+      .filter(c => c.name !== 'Created_at' && c.name !== 'Modified_at')
+      .map(c => {
+        if (currentLookups[c.name]) {
+          const options = currentLookups[c.name];
+          const optHtml = ['<option value="">—</option>'].concat(
+            options.map(o => `<option value="${o.value}">${o.value} – ${o.label}</option>`)
+          ).join('');
+          return `<label>${c.name}${c.nullable ? '' : ' *'}<select data-newcol="${c.name}">${optHtml}</select></label>`;
+        }
+        return `<label>${c.name}${c.nullable ? '' : ' *'}
+          <input type="text" data-newcol="${c.name}" placeholder="${c.type}">
+        </label>`;
+      }).join('');
   }
 
   async function saveRow(idx) {
-    const inputs = document.querySelectorAll(`input[data-row="${idx}"]`);
+    const inputs = document.querySelectorAll(`[data-row="${idx}"]`);
     const updates = {};
     inputs.forEach(inp => {
       const col = inp.dataset.col;
@@ -260,7 +296,7 @@
   }
 
   async function addRow() {
-    const inputs = document.querySelectorAll('input[data-newcol]');
+    const inputs = document.querySelectorAll('[data-newcol]');
     const body = {};
     inputs.forEach(inp => {
       const col = inp.dataset.newcol;
