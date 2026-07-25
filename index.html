@@ -188,6 +188,32 @@
     return n.toFixed(4);
   }
 
+  function toDateInputValue(v) {
+    if (!v) return '';
+    const s = String(v);
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
+  }
+
+  // Spalten mit Vorschlagsliste (Datalist) - erlaubt trotzdem freien Text
+  const DATALIST_COLUMNS = {
+    Currency: ['CHF', 'EUR', 'USD', 'GBP', 'JPY'],
+    DistributionType: ['Dividend', 'Ordinary Dividend', 'Special Dividend', 'Capital Gain', 'Return of Capital'],
+  };
+
+  function renderDatalists() {
+    const container = document.createElement('div');
+    container.style.display = 'none';
+    Object.entries(DATALIST_COLUMNS).forEach(([col, options]) => {
+      const dl = document.createElement('datalist');
+      dl.id = `datalist-${col}`;
+      dl.innerHTML = options.map(o => `<option value="${o}">`).join('');
+      container.appendChild(dl);
+    });
+    document.body.appendChild(container);
+  }
+  renderDatalists();
+
   // Spalten-spezifische Formatierung pro Tabelle
   const COLUMN_FORMATS = {
     security_distributions: { ExDate: 'dateOnly', PayDate: 'dateOnly' },
@@ -295,6 +321,15 @@
           return `<td><select data-col="${c.name}" data-row="${idx}" ${isPk ? 'disabled' : ''}>${optHtml}</select></td>`;
         }
 
+        if (c.type === 'date' && !isAutoField) {
+          return `<td><input type="date" data-col="${c.name}" data-row="${idx}" value="${toDateInputValue(rawVal)}" ${isPk ? 'disabled' : ''}></td>`;
+        }
+
+        if (DATALIST_COLUMNS[c.name]) {
+          const val = fmtCellValue(rawVal, c.name);
+          return `<td><input type="text" list="datalist-${c.name}" data-col="${c.name}" data-row="${idx}" value="${val.replace(/"/g, '&quot;')}" ${isPk ? 'disabled' : ''}></td>`;
+        }
+
         const val = fmtCellValue(rawVal, c.name);
         return `<td><input type="text" data-col="${c.name}" data-row="${idx}" value="${val.replace(/"/g, '&quot;')}" ${(isPk || isAutoField) ? 'disabled' : ''}></td>`;
       }).join('');
@@ -310,7 +345,7 @@
     const grid = document.getElementById('addGrid');
     addForm.classList.remove('hidden');
     grid.innerHTML = currentColumns
-      .filter(c => c.name !== 'Created_at' && c.name !== 'Modified_at')
+      .filter(c => c.name !== 'Created_at' && c.name !== 'Modified_at' && !c.isIdentity)
       .map(c => {
         if (currentLookups[c.name]) {
           const options = currentLookups[c.name];
@@ -318,6 +353,12 @@
             options.map(o => `<option value="${o.value}">${o.value} – ${o.label}</option>`)
           ).join('');
           return `<label>${c.name}${c.nullable ? '' : ' *'}<select data-newcol="${c.name}">${optHtml}</select></label>`;
+        }
+        if (c.type === 'date') {
+          return `<label>${c.name}${c.nullable ? '' : ' *'}<input type="date" data-newcol="${c.name}"></label>`;
+        }
+        if (DATALIST_COLUMNS[c.name]) {
+          return `<label>${c.name}${c.nullable ? '' : ' *'}<input type="text" list="datalist-${c.name}" data-newcol="${c.name}" placeholder="${c.type}"></label>`;
         }
         return `<label>${c.name}${c.nullable ? '' : ' *'}
           <input type="text" data-newcol="${c.name}" placeholder="${c.type}">
