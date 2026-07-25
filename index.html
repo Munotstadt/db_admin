@@ -76,6 +76,12 @@
   <div class="toolbar">
     <select id="tableSelect"><option value="">Tabelle wählen…</option></select>
     <button id="refreshBtn">Refresh</button>
+    <input type="text" id="searchInput" placeholder="Suchen (ganze Tabelle)…" style="min-width:220px">
+  </div>
+  <div class="toolbar">
+    <button id="prevBtn">← Zurück</button>
+    <span class="status" id="pageStatus"></span>
+    <button id="nextBtn">Weiter →</button>
     <span class="status" id="statusText"></span>
   </div>
 
@@ -148,36 +154,54 @@
     return String(v);
   }
 
-  async function loadTable(table) {
+  let currentOffset = 0;
+  let currentLimit = 100;
+  let currentTotal = 0;
+  let searchDebounce = null;
+
+  async function loadTable(table, resetOffset = true) {
     currentTable = table;
+    if (resetOffset) currentOffset = 0;
     const statusText = document.getElementById('statusText');
+    const pageStatus = document.getElementById('pageStatus');
     statusText.textContent = 'Lade…';
     try {
-      const data = await apiFetch(`/tables/${encodeURIComponent(table)}`);
+      const search = document.getElementById('searchInput').value.trim();
+      const params = new URLSearchParams({ limit: currentLimit, offset: currentOffset });
+      if (search) params.set('search', search);
+
+      const data = await apiFetch(`/tables/${encodeURIComponent(table)}?${params.toString()}`);
       currentColumns = data.columns;
       currentPk = data.primaryKey;
       currentRows = data.rows;
-      renderTable();
+      currentTotal = data.total;
+      renderTable(currentRows);
       renderAddForm();
-      statusText.textContent = `${currentRows.length} Zeile(n) · PK: ${currentPk}`;
+
+      const from = currentTotal === 0 ? 0 : currentOffset + 1;
+      const to = Math.min(currentOffset + currentLimit, currentTotal);
+      pageStatus.textContent = `${from}–${to} von ${currentTotal}`;
+      document.getElementById('prevBtn').disabled = currentOffset === 0;
+      document.getElementById('nextBtn').disabled = currentOffset + currentLimit >= currentTotal;
+      statusText.textContent = `PK: ${currentPk}`;
     } catch (e) {
       statusText.textContent = '';
       document.getElementById('tableBody').innerHTML = `<tr><td class="error">${e.message}</td></tr>`;
     }
   }
 
-  function renderTable() {
+  function renderTable(rowsToRender) {
     const head = document.getElementById('tableHead');
     const body = document.getElementById('tableBody');
 
     head.innerHTML = currentColumns.map(c => `<th>${c.name}</th>`).join('') + '<th>Aktionen</th>';
 
-    if (currentRows.length === 0) {
+    if (rowsToRender.length === 0) {
       body.innerHTML = `<tr><td colspan="${currentColumns.length + 1}" class="empty">Keine Zeilen.</td></tr>`;
       return;
     }
 
-    body.innerHTML = currentRows.map((row, idx) => {
+    body.innerHTML = rowsToRender.map((row, idx) => {
       const cells = currentColumns.map(c => {
         const isPk = c.name === currentPk;
         const val = fmtCellValue(row[c.name]);
@@ -258,7 +282,21 @@
   document.getElementById('passwordInput').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
   document.getElementById('logoutBtn').addEventListener('click', logout);
   document.getElementById('tableSelect').addEventListener('change', e => { if (e.target.value) loadTable(e.target.value); });
-  document.getElementById('refreshBtn').addEventListener('click', () => { if (currentTable) loadTable(currentTable); });
+  document.getElementById('refreshBtn').addEventListener('click', () => { if (currentTable) loadTable(currentTable, false); });
+  document.getElementById('searchInput').addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => { if (currentTable) loadTable(currentTable, true); }, 400);
+  });
+  document.getElementById('prevBtn').addEventListener('click', () => {
+    if (!currentTable || currentOffset === 0) return;
+    currentOffset = Math.max(0, currentOffset - currentLimit);
+    loadTable(currentTable, false);
+  });
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    if (!currentTable || currentOffset + currentLimit >= currentTotal) return;
+    currentOffset += currentLimit;
+    loadTable(currentTable, false);
+  });
   document.getElementById('addSubmitBtn').addEventListener('click', addRow);
 
   // Auto-Login, falls Passwort noch in dieser Session gespeichert ist
