@@ -268,14 +268,30 @@ def insert_row(req: func.HttpRequest) -> func.HttpResponse:
         if not is_valid_table(conn, table):
             return json_response({"error": "Invalid table"}, status_code=400)
 
+        pk = get_primary_key(conn, table)
+        identity_columns = get_identity_columns(conn, table)
+
+        # Primary Key nie vom Client uebernehmen
+        body = dict(body)
+        body.pop(pk, None)
+
         cols = list(body.keys())
-        if not cols:
-            return json_response({"error": "No columns provided"}, status_code=400)
-        placeholders = ", ".join("?" for _ in cols)
-        col_list = ", ".join(f"[{c}]" for c in cols)
         values = [body[c] for c in cols]
 
         cursor = conn.cursor()
+
+        if pk not in identity_columns:
+            cursor.execute(f"SELECT ISNULL(MAX([{pk}]), 0) + 1 FROM [{table}]")
+            next_pk = cursor.fetchone()[0]
+            cols = [pk] + cols
+            values = [next_pk] + values
+
+        if not cols:
+            return json_response({"error": "No columns provided"}, status_code=400)
+
+        placeholders = ", ".join("?" for _ in cols)
+        col_list = ", ".join(f"[{c}]" for c in cols)
+
         cursor.execute(f"INSERT INTO [{table}] ({col_list}) VALUES ({placeholders})", values)
         conn.commit()
         conn.close()
