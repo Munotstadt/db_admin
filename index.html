@@ -39,6 +39,8 @@
   table{ width:100%; border-collapse:collapse; font-size:13px; }
   thead th{ text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.06em;
     text-transform:uppercase; color:var(--muted); padding:8px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  thead th.sortable{ cursor:pointer; user-select:none; }
+  thead th.sortable:hover{ color:var(--text); }
   tbody td{ padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
   tbody tr:hover{ background:var(--panel); }
   td input{ width:100%; min-width:80px; padding:4px 6px; font-size:12px; border:1px solid transparent; background:transparent; }
@@ -161,16 +163,61 @@
     return parts.replace(',', '');
   }
 
+  function fmtDateOnly(value) {
+    if (!value) return '';
+    const s = String(value);
+    // Reines Datum (kein Zeitanteil): direkt umformatieren, keine Zeitzonen-Konvertierung noetig
+    const dateOnlyMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dateOnlyMatch && !s.includes('T')) {
+      const [, y, m, d] = dateOnlyMatch;
+      return `${d}.${m}.${y}`;
+    }
+    // Datum mit Zeitanteil: als UTC interpretieren und ins Schweizer Kalenderdatum umrechnen
+    const iso = s.endsWith('Z') ? s : s + 'Z';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return s;
+    return new Intl.DateTimeFormat('de-CH', {
+      timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric'
+    }).format(d);
+  }
+
+  function fmtDecimal4(value) {
+    if (value === null || value === undefined || value === '') return '';
+    const n = parseFloat(value);
+    if (isNaN(n)) return String(value);
+    return n.toFixed(4);
+  }
+
+  // Spalten-spezifische Formatierung pro Tabelle
+  const COLUMN_FORMATS = {
+    security_distributions: { ExDate: 'dateOnly', PayDate: 'dateOnly' },
+    security_parameter_log: { ValidFrom: 'dateOnly', ValidTo: 'dateOnly' },
+    security_prices: { ValueDate: 'dateOnly', PriceLC: 'decimal4' },
+  };
+
   function fmtCellValue(v, columnName) {
     if (v === null || v === undefined) return '';
     if (columnName === 'Created_at' || columnName === 'Modified_at') return fmtDateTimeCH(v);
+    const tableFormats = COLUMN_FORMATS[currentTable];
+    const format = tableFormats && tableFormats[columnName];
+    if (format === 'dateOnly') return fmtDateOnly(v);
+    if (format === 'decimal4') return fmtDecimal4(v);
     return String(v);
+  }
+
+  // Created_at/Modified_at werden immer ganz nach rechts geschoben, unabhaengig von der Tabelle
+  function getDisplayColumns() {
+    const rest = currentColumns.filter(c => c.name !== 'Created_at' && c.name !== 'Modified_at');
+    const dates = currentColumns.filter(c => c.name === 'Created_at' || c.name === 'Modified_at');
+    return rest.concat(dates);
   }
 
   let currentOffset = 0;
   let currentLimit = 100;
   let currentTotal = 0;
   let currentLookups = {};
+  let currentOrderBy = null;
+  let currentOrderDir = 'DESC';
   let searchDebounce = null;
 
   async function loadTable(table, resetOffset = true) {
@@ -183,6 +230,7 @@
       const search = document.getElementById('searchInput').value.trim();
       const params = new URLSearchParams({ limit: currentLimit, offset: currentOffset });
       if (search) params.set('search', search);
+      if (currentOrderBy) { params.set('orderBy', currentOrderBy); params.set('orderDir', currentOrderDir); }
 
       const data = await apiFetch(`/tables/${encodeURIComponent(table)}?${params.toString()}`);
       currentColumns = data.columns;
@@ -190,6 +238,8 @@
       currentRows = data.rows;
       currentTotal = data.total;
       currentLookups = data.lookups || {};
+      currentOrderBy = data.orderBy;
+      currentOrderDir = data.orderDir;
       renderTable(currentRows);
       renderAddForm();
 
@@ -205,19 +255,34 @@
     }
   }
 
+  function sortByColumn(columnName) {
+    if (currentOrderBy === columnName) {
+      currentOrderDir = currentOrderDir === 'ASC' ? 'DESC' : 'ASC';
+    } else {
+      currentOrderBy = columnName;
+      currentOrderDir = 'ASC';
+    }
+    if (currentTable) loadTable(currentTable, true);
+  }
+
   function renderTable(rowsToRender) {
     const head = document.getElementById('tableHead');
     const body = document.getElementById('tableBody');
+    const displayColumns = getDisplayColumns();
 
-    head.innerHTML = currentColumns.map(c => `<th>${c.name}</th>`).join('') + '<th>Aktionen</th>';
+    head.innerHTML = displayColumns.map(c => {
+      const isSorted = c.name === currentOrderBy;
+      const arrow = isSorted ? (currentOrderDir === 'ASC' ? ' ▲' : ' ▼') : '';
+      return `<th class="sortable" onclick="sortByColumn('${c.name}')">${c.name}${arrow}</th>`;
+    }).join('') + '<th>Aktionen</th>';
 
     if (rowsToRender.length === 0) {
-      body.innerHTML = `<tr><td colspan="${currentColumns.length + 1}" class="empty">Keine Zeilen.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="${displayColumns.length + 1}" class="empty">Keine Zeilen.</td></tr>`;
       return;
     }
 
     body.innerHTML = rowsToRender.map((row, idx) => {
-      const cells = currentColumns.map(c => {
+      const cells = displayColumns.map(c => {
         const isPk = c.name === currentPk;
         const isAutoField = c.name === 'Modified_at' || c.name === 'Created_at';
         const rawVal = row[c.name];
