@@ -1,521 +1,303 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de-CH">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Securities Data - Admin</title>
+<title>Turso Usage Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg: #FFFFFF; --panel: #F7F8FA; --line: #E3E6EA; --text: #1A1D22;
-    --muted: #767E8A; --accent: #E30613; --gain: #1F8A6E; --loss: #C0293D; --radius: 3px;
+  :root {
+    --red: #E30613;
+    --bg: #0f1115;
+    --card: #171a21;
+    --border: #262a33;
+    --text: #e8e9ec;
+    --muted: #8b909c;
   }
-  * { box-sizing: border-box; }
-  body{ margin:0; background:var(--bg); color:var(--text); font-family:'Inter',system-ui,sans-serif;
-    min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:48px 20px 80px; }
-  .wrap{ width:100%; max-width:1100px; }
-  .eyebrow{ display:flex; align-items:center; justify-content:space-between; padding-bottom:18px;
-    border-bottom:2px solid var(--accent); margin-bottom:20px; }
-  h1{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; text-transform:uppercase; margin:0; }
-  .sub{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted); }
-  .hidden{ display:none !important; }
-  input, select, button{ font-family:'IBM Plex Mono',monospace; font-size:13px; }
-  input, select{ padding:8px 10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg); color:var(--text); }
-  button{ padding:8px 14px; border:1px solid var(--line); border-radius:var(--radius); background:none; color:var(--text); cursor:pointer; }
-  button:hover{ border-color:var(--muted); }
-  button.primary{ background:var(--text); color:var(--bg); border-color:var(--text); font-weight:600; }
-  button.danger{ color:var(--loss); border-color:var(--loss); }
-
-  #loginView{ max-width:360px; margin:80px auto 0; text-align:center; }
-  #loginView input{ width:100%; margin:12px 0; }
-  #loginError{ color:var(--loss); font-size:12px; min-height:16px; }
-
-  .toolbar{ display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-  .toolbar select{ min-width:220px; }
-  .status{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted); margin-left:auto; }
-
-  table{ width:100%; border-collapse:collapse; font-size:13px; }
-  thead th{ text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.06em;
-    text-transform:uppercase; color:var(--muted); padding:8px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
-  thead th.sortable{ cursor:pointer; user-select:none; }
-  thead th.sortable:hover{ color:var(--text); }
-  tbody td{ padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
-  tbody tr:hover{ background:var(--panel); }
-  td input{ width:100%; min-width:80px; padding:4px 6px; font-size:12px; border:1px solid transparent; background:transparent; }
-  td input:focus{ border-color:var(--accent); background:var(--bg); outline:none; }
-  .row-actions{ display:flex; gap:6px; white-space:nowrap; }
-  .row-actions button{ padding:4px 8px; font-size:11px; }
-
-  .table-scroll{ overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); }
-
-  .add-form{ margin-top:20px; padding:16px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); }
-  .add-form h3{ font-family:'Space Grotesk',sans-serif; font-size:14px; margin:0 0 12px; }
-  .add-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-bottom:12px; }
-  .add-grid label{ display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
-
-  .empty{ padding:40px; text-align:center; color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:13px; }
-  .error{ color:var(--loss); }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    padding: 20px 16px 60px;
+  }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 20px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .db-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .db-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .db-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .db-updated {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .metric {
+    background: #11131a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .metric-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .metric-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 500;
+  }
+  .metric-value.accent { color: var(--red); }
+  .chart-block { margin-top: 10px; }
+  .chart-title {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+  .line { fill: none; stroke: var(--red); stroke-width: 2; }
+  .dot { fill: var(--red); }
+  .dot-hit { fill: transparent; }
+  .axis-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    fill: var(--muted);
+  }
+  .grid-line { stroke: var(--border); stroke-width: 1; }
+  #tooltip {
+    position: fixed;
+    background: #000;
+    border: 1px solid var(--red);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    pointer-events: none;
+    display: none;
+    z-index: 10;
+    white-space: nowrap;
+  }
+  .empty-state {
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 40px 0;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
 
-<div id="loginView">
-  <h1>Securities Admin</h1>
-  <div class="sub">Passwort erforderlich</div>
-  <input type="password" id="passwordInput" placeholder="Passwort">
-  <button class="primary" id="loginBtn" style="width:100%">Anmelden</button>
-  <div id="loginError"></div>
-</div>
+<h1>Turso Usage</h1>
+<div class="subtitle" id="subtitle">lädt …</div>
+<div id="content"></div>
+<div id="tooltip"></div>
 
-<div class="wrap hidden" id="appView">
-  <div class="eyebrow">
-    <div><h1>Securities Admin</h1><span class="sub">SecuritiesDBtwo</span></div>
-    <button id="logoutBtn">Logout</button>
-  </div>
-
-  <div class="toolbar">
-    <select id="tableSelect"><option value="">Tabelle wählen…</option></select>
-    <button id="refreshBtn">Refresh</button>
-    <input type="text" id="searchInput" placeholder="Suchen (ganze Tabelle)…" style="min-width:220px">
-  </div>
-  <div class="toolbar">
-    <button id="prevBtn">← Zurück</button>
-    <span class="status" id="pageStatus"></span>
-    <button id="nextBtn">Weiter →</button>
-    <span class="status" id="statusText"></span>
-  </div>
-
-  <div class="table-scroll">
-    <table id="dataTable">
-      <thead><tr id="tableHead"></tr></thead>
-      <tbody id="tableBody"><tr><td class="empty">Wähle eine Tabelle.</td></tr></tbody>
-    </table>
-  </div>
-
-  <div class="add-form hidden" id="addForm">
-    <h3>Neue Zeile hinzufügen</h3>
-    <div class="add-grid" id="addGrid"></div>
-    <button class="primary" id="addSubmitBtn">Hinzufügen</button>
-  </div>
-</div>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script>
-  const API_BASE = "/api"; // Static Web Apps routet /api automatisch zur Function
+const CSV_URL = "data/turso_usage.csv"; // ggf. relativen Pfad anpassen
+const tooltip = document.getElementById("tooltip");
 
-  let currentTable = null;
-  let currentColumns = [];
-  let currentPk = null;
-  let currentRows = [];
+function fmtBytes(n) {
+  n = Number(n);
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
+}
 
-  function getPassword() { return sessionStorage.getItem('adminPassword') || ''; }
+function fmtInt(n) {
+  return Number(n).toLocaleString('de-CH');
+}
 
-  async function apiFetch(path, options = {}) {
-    const res = await fetch(API_BASE + path, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': getPassword(), ...(options.headers || {}) }
+function parseDatum(d) {
+  // DD.MM.YYYY -> Date
+  const [dd, mm, yyyy] = d.split('.').map(Number);
+  return new Date(Date.UTC(yyyy, mm - 1, dd));
+}
+
+function buildSparkline(rows, key, formatter, id) {
+  const w = 600, h = 90, padL = 4, padR = 4, padT = 10, padB = 18;
+  const values = rows.map(r => Number(r[key]));
+  const max = Math.max(...values, 1);
+  const min = 0;
+  const stepX = (w - padL - padR) / Math.max(values.length - 1, 1);
+
+  const points = values.map((v, i) => {
+    const x = padL + i * stepX;
+    const y = padT + (1 - (v - min) / (max - min || 1)) * (h - padT - padB);
+    return { x, y, v, datum: rows[i]['Datum'] };
+  });
+
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  let dots = '';
+  points.forEach((p, i) => {
+    dots += `<circle class="dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5"></circle>`;
+    dots += `<circle class="dot-hit" data-idx="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="12"></circle>`;
+  });
+
+  const firstLabel = points[0] ? points[0].datum : '';
+  const lastLabel = points[points.length - 1] ? points[points.length - 1].datum : '';
+
+  const svg = `
+    <svg viewBox="0 0 ${w} ${h}" id="${id}" data-key="${key}">
+      <line class="grid-line" x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}"></line>
+      <path class="line" d="${pathD}"></path>
+      ${dots}
+      <text class="axis-label" x="${padL}" y="${h - 4}">${firstLabel}</text>
+      <text class="axis-label" x="${w - padR}" y="${h - 4}" text-anchor="end">${lastLabel}</text>
+    </svg>`;
+
+  return { svg, points, formatter };
+}
+
+function attachTooltip(containerId, points, formatter, label) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.querySelectorAll('.dot-hit').forEach(hit => {
+    const idx = Number(hit.dataset.idx);
+    const p = points[idx];
+    const show = (clientX, clientY) => {
+      tooltip.style.display = 'block';
+      tooltip.style.left = (clientX + 12) + 'px';
+      tooltip.style.top = (clientY - 30) + 'px';
+      tooltip.innerHTML = `${p.datum}<br>${label}: <b>${formatter(p.v)}</b>`;
+    };
+    hit.addEventListener('mousemove', e => show(e.clientX, e.clientY));
+    hit.addEventListener('mouseleave', () => tooltip.style.display = 'none');
+    hit.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      show(t.clientX, t.clientY);
+    }, { passive: true });
+  });
+  el.addEventListener('touchend', () => {
+    setTimeout(() => tooltip.style.display = 'none', 1500);
+  });
+}
+
+function render(rowsByDb) {
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+
+  const dbNames = Object.keys(rowsByDb).sort();
+  dbNames.forEach((dbName, dbIdx) => {
+    const rows = rowsByDb[dbName].sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
+    const latest = rows[rows.length - 1];
+
+    const card = document.createElement('div');
+    card.className = 'db-card';
+
+    card.innerHTML = `
+      <div class="db-header">
+        <div class="db-name">${dbName}</div>
+        <div class="db-updated">Stand: ${latest.Datum}</div>
+      </div>
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">Rows Read</div>
+          <div class="metric-value accent">${fmtInt(latest.RowsRead)}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Rows Written</div>
+          <div class="metric-value accent">${fmtInt(latest.RowsWritten)}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Bytes Synced</div>
+          <div class="metric-value">${fmtBytes(latest.BytesSynced)}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Storage</div>
+          <div class="metric-value">${fmtBytes(latest.StorageBytes)}</div>
+        </div>
+      </div>
+    `;
+
+    const charts = [
+      { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read / Tag' },
+      { key: 'RowsWritten', label: 'Rows Written', formatter: fmtInt, title: 'Rows Written / Tag' },
+      { key: 'StorageBytes', label: 'Storage', formatter: fmtBytes, title: 'Storage-Verlauf' },
+    ];
+
+    charts.forEach((c, cIdx) => {
+      if (rows.length < 2) return; // Sparkline braucht min. 2 Punkte
+      const chartId = `chart-${dbIdx}-${cIdx}`;
+      const { svg, points, formatter } = buildSparkline(rows, c.key, c.formatter, chartId);
+      const block = document.createElement('div');
+      block.className = 'chart-block';
+      block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
+      card.appendChild(block);
+      setTimeout(() => attachTooltip(chartId, points, formatter, c.label), 0);
     });
-    if (res.status === 401) throw new Error('UNAUTHORIZED');
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `HTTP ${res.status}`);
-    }
-    return res.json();
-  }
 
-  async function login() {
-    const pwd = document.getElementById('passwordInput').value;
-    sessionStorage.setItem('adminPassword', pwd);
-    try {
-      const tables = await apiFetch('/tables');
-      showApp(tables);
-    } catch (e) {
-      document.getElementById('loginError').textContent = e.message === 'UNAUTHORIZED' ? 'Falsches Passwort.' : e.message;
-      sessionStorage.removeItem('adminPassword');
-    }
-  }
+    content.appendChild(card);
+  });
+}
 
-  function showApp(tables) {
-    document.getElementById('loginView').classList.add('hidden');
-    document.getElementById('appView').classList.remove('hidden');
-    const select = document.getElementById('tableSelect');
-    select.innerHTML = '<option value="">Tabelle wählen…</option>' +
-      tables.map(t => `<option value="${t}">${t}</option>`).join('');
-  }
-
-  function logout() {
-    sessionStorage.removeItem('adminPassword');
-    document.getElementById('appView').classList.add('hidden');
-    document.getElementById('loginView').classList.remove('hidden');
-    document.getElementById('passwordInput').value = '';
-  }
-
-  function fmtDateTimeCH(isoString) {
-    if (!isoString) return '';
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return String(isoString);
-    const parts = new Intl.DateTimeFormat('de-CH', {
-      timeZone: 'Europe/Zurich',
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: false
-    }).format(d);
-    return parts.replace(',', '');
-  }
-
-  function fmtDateOnly(value) {
-    if (!value) return '';
-    const s = String(value);
-    // Reines Datum (kein Zeitanteil): direkt umformatieren, keine Zeitzonen-Konvertierung noetig
-    const dateOnlyMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (dateOnlyMatch && !s.includes('T')) {
-      const [, y, m, d] = dateOnlyMatch;
-      return `${d}.${m}.${y}`;
-    }
-    // Datum mit Zeitanteil: als UTC interpretieren und ins Schweizer Kalenderdatum umrechnen
-    const iso = s.endsWith('Z') ? s : s + 'Z';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return s;
-    return new Intl.DateTimeFormat('de-CH', {
-      timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric'
-    }).format(d);
-  }
-
-  function fmtDecimal4(value) {
-    if (value === null || value === undefined || value === '') return '';
-    const n = parseFloat(value);
-    if (isNaN(n)) return String(value);
-    return n.toFixed(4);
-  }
-
-  function toDateInputValue(v) {
-    if (!v) return '';
-    const s = String(v);
-    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
-    return m ? m[1] : '';
-  }
-
-  function fmtDateTimeInputCH(isoString) {
-    if (!isoString) return '';
-    const s = String(isoString);
-    const iso = s.endsWith('Z') ? s : s + 'Z';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '';
-    const parts = new Intl.DateTimeFormat('de-CH', {
-      timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-    }).formatToParts(d);
-    const get = t => parts.find(p => p.type === t).value;
-    return `${get('day')}.${get('month')}.${get('year')} ${get('hour')}:${get('minute')}:${get('second')}`;
-  }
-
-  function nowFormattedCH() {
-    return fmtDateTimeInputCH(new Date().toISOString());
-  }
-
-  function parseChDateTimeToISO(str) {
-    if (!str) return null;
-    const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
-    if (!m) return null;
-    const [, dd, mo, yyyy, hh, mi, ss] = m;
-    const y = parseInt(yyyy, 10), mon = parseInt(mo, 10), d = parseInt(dd, 10);
-    const h = parseInt(hh, 10), min = parseInt(mi, 10), sec = ss ? parseInt(ss, 10) : 0;
-
-    // Wall-clock-Zeit in Zuerich -> UTC umrechnen (beruecksichtigt MEZ/MESZ automatisch)
-    const utcGuess = Date.UTC(y, mon - 1, d, h, min, sec);
-    const fmt = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Europe/Zurich', hour12: false,
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit'
-    });
-    const parts = fmt.formatToParts(new Date(utcGuess));
-    const get = t => parseInt(parts.find(p => p.type === t).value, 10);
-    const zurichAsIfUTC = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
-    const diff = zurichAsIfUTC - utcGuess;
-    const actualUTC = utcGuess - diff;
-    return new Date(actualUTC).toISOString().slice(0, 19);
-  }
-
-  const DATETIME_TYPES = ['datetime2', 'datetime', 'smalldatetime', 'datetimeoffset'];
-
-  // Spalten mit Vorschlagsliste (Datalist) - erlaubt trotzdem freien Text
-  const DATALIST_COLUMNS = {
-    Currency: ['CHF', 'EUR', 'USD', 'GBP', 'JPY'],
-    DistributionType: ['Dividend', 'Ordinary Dividend', 'Special Dividend', 'Capital Gain', 'Return of Capital'],
-  };
-
-  function renderDatalists() {
-    const container = document.createElement('div');
-    container.style.display = 'none';
-    Object.entries(DATALIST_COLUMNS).forEach(([col, options]) => {
-      const dl = document.createElement('datalist');
-      dl.id = `datalist-${col}`;
-      dl.innerHTML = options.map(o => `<option value="${o}">`).join('');
-      container.appendChild(dl);
-    });
-    document.body.appendChild(container);
-  }
-  renderDatalists();
-
-  // Spalten-spezifische Formatierung pro Tabelle
-  const COLUMN_FORMATS = {
-    security_distributions: { ExDate: 'dateOnly', PayDate: 'dateOnly' },
-    security_parameter_log: { ValidFrom: 'dateOnly', ValidTo: 'dateOnly' },
-    security_prices: { ValueDate: 'dateOnly', PriceLC: 'decimal4' },
-  };
-
-  function fmtCellValue(v, columnName) {
-    if (v === null || v === undefined) return '';
-    if (columnName === 'Created_at' || columnName === 'Modified_at') return fmtDateTimeCH(v);
-    const tableFormats = COLUMN_FORMATS[currentTable];
-    const format = tableFormats && tableFormats[columnName];
-    if (format === 'dateOnly') return fmtDateOnly(v);
-    if (format === 'decimal4') return fmtDecimal4(v);
-    return String(v);
-  }
-
-  // Created_at/Modified_at werden immer ganz nach rechts geschoben, unabhaengig von der Tabelle
-  function getDisplayColumns() {
-    const rest = currentColumns.filter(c => c.name !== 'Created_at' && c.name !== 'Modified_at');
-    const dates = currentColumns.filter(c => c.name === 'Created_at' || c.name === 'Modified_at');
-    return rest.concat(dates);
-  }
-
-  let currentOffset = 0;
-  let currentLimit = 100;
-  let currentTotal = 0;
-  let currentLookups = {};
-  let currentOrderBy = null;
-  let currentOrderDir = 'DESC';
-  let searchDebounce = null;
-
-  async function loadTable(table, resetOffset = true) {
-    currentTable = table;
-    if (resetOffset) currentOffset = 0;
-    const statusText = document.getElementById('statusText');
-    const pageStatus = document.getElementById('pageStatus');
-    statusText.textContent = 'Lade…';
-    try {
-      const search = document.getElementById('searchInput').value.trim();
-      const params = new URLSearchParams({ limit: currentLimit, offset: currentOffset });
-      if (search) params.set('search', search);
-      if (currentOrderBy) { params.set('orderBy', currentOrderBy); params.set('orderDir', currentOrderDir); }
-
-      const data = await apiFetch(`/tables/${encodeURIComponent(table)}?${params.toString()}`);
-      currentColumns = data.columns;
-      currentPk = data.primaryKey;
-      currentRows = data.rows;
-      currentTotal = data.total;
-      currentLookups = data.lookups || {};
-      currentOrderBy = data.orderBy;
-      currentOrderDir = data.orderDir;
-      renderTable(currentRows);
-      renderAddForm();
-
-      const from = currentTotal === 0 ? 0 : currentOffset + 1;
-      const to = Math.min(currentOffset + currentLimit, currentTotal);
-      pageStatus.textContent = `${from}–${to} von ${currentTotal}`;
-      document.getElementById('prevBtn').disabled = currentOffset === 0;
-      document.getElementById('nextBtn').disabled = currentOffset + currentLimit >= currentTotal;
-      statusText.textContent = `PK: ${currentPk}`;
-    } catch (e) {
-      statusText.textContent = '';
-      document.getElementById('tableBody').innerHTML = `<tr><td class="error">${e.message}</td></tr>`;
-    }
-  }
-
-  function sortByColumn(columnName) {
-    if (currentOrderBy === columnName) {
-      currentOrderDir = currentOrderDir === 'ASC' ? 'DESC' : 'ASC';
-    } else {
-      currentOrderBy = columnName;
-      currentOrderDir = 'ASC';
-    }
-    if (currentTable) loadTable(currentTable, true);
-  }
-
-  function renderTable(rowsToRender) {
-    const head = document.getElementById('tableHead');
-    const body = document.getElementById('tableBody');
-    const displayColumns = getDisplayColumns();
-
-    head.innerHTML = displayColumns.map(c => {
-      const isSorted = c.name === currentOrderBy;
-      const arrow = isSorted ? (currentOrderDir === 'ASC' ? ' ▲' : ' ▼') : '';
-      return `<th class="sortable" onclick="sortByColumn('${c.name}')">${c.name}${arrow}</th>`;
-    }).join('') + '<th>Aktionen</th>';
-
-    if (rowsToRender.length === 0) {
-      body.innerHTML = `<tr><td colspan="${displayColumns.length + 1}" class="empty">Keine Zeilen.</td></tr>`;
+Papa.parse(CSV_URL, {
+  download: true,
+  header: true,
+  delimiter: ";",
+  skipEmptyLines: true,
+  complete: (results) => {
+    const rows = results.data.filter(r => r.Datenbank);
+    if (rows.length === 0) {
+      document.getElementById('content').innerHTML = '<div class="empty-state">Noch keine Daten vorhanden.</div>';
+      document.getElementById('subtitle').textContent = 'keine Daten';
       return;
     }
-
-    body.innerHTML = rowsToRender.map((row, idx) => {
-      const cells = displayColumns.map(c => {
-        const isPk = c.name === currentPk;
-        const isAutoField = c.name === 'Modified_at' || c.name === 'Created_at';
-        const rawVal = row[c.name];
-
-        if (currentLookups[c.name]) {
-          const options = currentLookups[c.name];
-          const optHtml = ['<option value="">—</option>'].concat(
-            options.map(o => `<option value="${o.value}" ${String(o.value) === String(rawVal) ? 'selected' : ''}>${o.value} – ${o.label}</option>`)
-          ).join('');
-          return `<td><select data-col="${c.name}" data-row="${idx}" ${isPk ? 'disabled' : ''}>${optHtml}</select></td>`;
-        }
-
-        if (c.type === 'date' && !isAutoField) {
-          return `<td><input type="date" data-col="${c.name}" data-row="${idx}" value="${toDateInputValue(rawVal)}" ${isPk ? 'disabled' : ''}></td>`;
-        }
-
-        if (DATETIME_TYPES.includes(c.type) && !isAutoField) {
-          const displayVal = fmtDateTimeInputCH(rawVal);
-          return `<td><input type="text" data-col="${c.name}" data-row="${idx}" data-datetime="1" value="${displayVal}" placeholder="TT.MM.JJJJ HH:MM:SS" ${isPk ? 'disabled' : ''}></td>`;
-        }
-
-        if (DATALIST_COLUMNS[c.name]) {
-          const val = fmtCellValue(rawVal, c.name);
-          return `<td><input type="text" list="datalist-${c.name}" data-col="${c.name}" data-row="${idx}" value="${val.replace(/"/g, '&quot;')}" ${isPk ? 'disabled' : ''}></td>`;
-        }
-
-        const val = fmtCellValue(rawVal, c.name);
-        return `<td><input type="text" data-col="${c.name}" data-row="${idx}" value="${val.replace(/"/g, '&quot;')}" ${(isPk || isAutoField) ? 'disabled' : ''}></td>`;
-      }).join('');
-      return `<tr>${cells}<td class="row-actions">
-        <button onclick="saveRow(${idx})">Speichern</button>
-        <button class="danger" onclick="deleteRow(${idx})">Löschen</button>
-      </td></tr>`;
-    }).join('');
+    const rowsByDb = {};
+    rows.forEach(r => {
+      if (!rowsByDb[r.Datenbank]) rowsByDb[r.Datenbank] = [];
+      rowsByDb[r.Datenbank].push(r);
+    });
+    document.getElementById('subtitle').textContent =
+      `${Object.keys(rowsByDb).length} Datenbank(en) · letztes Update ${rows[rows.length - 1].Datum}`;
+    render(rowsByDb);
+  },
+  error: (err) => {
+    document.getElementById('content').innerHTML =
+      `<div class="empty-state">Fehler beim Laden der CSV: ${err.message}</div>`;
   }
-
-  function renderAddForm() {
-    const addForm = document.getElementById('addForm');
-    const grid = document.getElementById('addGrid');
-    addForm.classList.remove('hidden');
-    grid.innerHTML = currentColumns
-      .filter(c => c.name !== 'Created_at' && c.name !== 'Modified_at' && c.name !== currentPk && !c.isIdentity)
-      .map(c => {
-        if (currentLookups[c.name]) {
-          const options = currentLookups[c.name];
-          const optHtml = ['<option value="">—</option>'].concat(
-            options.map(o => `<option value="${o.value}">${o.value} – ${o.label}</option>`)
-          ).join('');
-          return `<label>${c.name}${c.nullable ? '' : ' *'}<select data-newcol="${c.name}">${optHtml}</select></label>`;
-        }
-        if (c.type === 'date') {
-          return `<label>${c.name}${c.nullable ? '' : ' *'}<input type="date" data-newcol="${c.name}"></label>`;
-        }
-        if (DATETIME_TYPES.includes(c.type)) {
-          return `<label>${c.name}${c.nullable ? '' : ' *'}<input type="text" data-newcol="${c.name}" data-datetime="1" value="${nowFormattedCH()}" placeholder="TT.MM.JJJJ HH:MM:SS"></label>`;
-        }
-        if (DATALIST_COLUMNS[c.name]) {
-          return `<label>${c.name}${c.nullable ? '' : ' *'}<input type="text" list="datalist-${c.name}" data-newcol="${c.name}" placeholder="${c.type}"></label>`;
-        }
-        return `<label>${c.name}${c.nullable ? '' : ' *'}
-          <input type="text" data-newcol="${c.name}" placeholder="${c.type}">
-        </label>`;
-      }).join('');
-  }
-
-  async function saveRow(idx) {
-    const inputs = document.querySelectorAll(`[data-row="${idx}"]`);
-    const updates = {};
-    for (const inp of inputs) {
-      const col = inp.dataset.col;
-      if (col === currentPk) continue;
-      let val = inp.value === '' ? null : inp.value;
-      if (inp.dataset.datetime === '1' && val) {
-        const parsed = parseChDateTimeToISO(val);
-        if (!parsed) {
-          alert(`Ungültiges Datum/Zeit-Format bei ${col}. Erwartet: TT.MM.JJJJ HH:MM:SS`);
-          return;
-        }
-        val = parsed;
-      }
-      updates[col] = val;
-    }
-    const pkValue = currentRows[idx][currentPk];
-    try {
-      await apiFetch(`/tables/${encodeURIComponent(currentTable)}`, {
-        method: 'PUT',
-        body: JSON.stringify({ pkColumn: currentPk, pkValue, updates })
-      });
-      document.getElementById('statusText').textContent = 'Gespeichert.';
-      loadTable(currentTable);
-    } catch (e) {
-      alert('Fehler beim Speichern: ' + e.message);
-    }
-  }
-
-  async function deleteRow(idx) {
-    const pkValue = currentRows[idx][currentPk];
-    if (!confirm(`Zeile mit ${currentPk} = ${pkValue} wirklich löschen?`)) return;
-    try {
-      await apiFetch(`/tables/${encodeURIComponent(currentTable)}`, {
-        method: 'DELETE',
-        body: JSON.stringify({ pkColumn: currentPk, pkValue })
-      });
-      loadTable(currentTable);
-    } catch (e) {
-      alert('Fehler beim Löschen: ' + e.message);
-    }
-  }
-
-  async function addRow() {
-    const inputs = document.querySelectorAll('[data-newcol]');
-    const body = {};
-    for (const inp of inputs) {
-      const col = inp.dataset.newcol;
-      if (inp.value === '') continue;
-      let val = inp.value;
-      if (inp.dataset.datetime === '1') {
-        const parsed = parseChDateTimeToISO(val);
-        if (!parsed) {
-          alert(`Ungültiges Datum/Zeit-Format bei ${col}. Erwartet: TT.MM.JJJJ HH:MM:SS`);
-          return;
-        }
-        val = parsed;
-      }
-      body[col] = val;
-    }
-    try {
-      await apiFetch(`/tables/${encodeURIComponent(currentTable)}`, {
-        method: 'POST',
-        body: JSON.stringify(body)
-      });
-      inputs.forEach(inp => inp.value = '');
-      loadTable(currentTable);
-    } catch (e) {
-      alert('Fehler beim Hinzufügen: ' + e.message);
-    }
-  }
-
-  document.getElementById('loginBtn').addEventListener('click', login);
-  document.getElementById('passwordInput').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
-  document.getElementById('logoutBtn').addEventListener('click', logout);
-  document.getElementById('tableSelect').addEventListener('change', e => { if (e.target.value) loadTable(e.target.value); });
-  document.getElementById('refreshBtn').addEventListener('click', () => { if (currentTable) loadTable(currentTable, false); });
-  document.getElementById('searchInput').addEventListener('input', () => {
-    clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(() => { if (currentTable) loadTable(currentTable, true); }, 400);
-  });
-  document.getElementById('prevBtn').addEventListener('click', () => {
-    if (!currentTable || currentOffset === 0) return;
-    currentOffset = Math.max(0, currentOffset - currentLimit);
-    loadTable(currentTable, false);
-  });
-  document.getElementById('nextBtn').addEventListener('click', () => {
-    if (!currentTable || currentOffset + currentLimit >= currentTotal) return;
-    currentOffset += currentLimit;
-    loadTable(currentTable, false);
-  });
-  document.getElementById('addSubmitBtn').addEventListener('click', addRow);
-
-  // Auto-Login, falls Passwort noch in dieser Session gespeichert ist
-  if (getPassword()) {
-    apiFetch('/tables').then(showApp).catch(() => sessionStorage.removeItem('adminPassword'));
-  }
+});
 </script>
-
 </body>
 </html>
