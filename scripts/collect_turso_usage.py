@@ -58,7 +58,15 @@ def get_usage(org: str, db_name: str, token: str, day_start: datetime, day_end: 
         "to": day_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     data = api_get(f"/organizations/{org}/databases/{db_name}/usage", token, params)
-    return data["database"]["total"]
+
+    # Die API-Antwortstruktur kann variieren (mit/ohne "database"-Wrapper,
+    # Gross-/Kleinschreibung der Keys). Robust gegen beides.
+    node = data.get("database", data)
+    total = node.get("total") or node.get("Total")
+    if total is None:
+        print(f"WARNUNG: Unerwartete Antwortstruktur für {db_name}: {data}", file=sys.stderr)
+        return {"rows_read": 0, "rows_written": 0, "bytes_synced": 0, "storage_bytes": 0}
+    return total
 
 
 def load_existing_keys(path: str) -> set[tuple[str, str]]:
@@ -108,10 +116,10 @@ def main() -> None:
         rows_to_write.append([
             datum_str,
             db_name,
-            usage.get("rows_read", 0),
-            usage.get("rows_written", 0),
-            usage.get("bytes_synced", 0),
-            usage.get("storage_bytes", 0),
+            usage.get("rows_read", usage.get("RowsRead", 0)),
+            usage.get("rows_written", usage.get("RowsWritten", 0)),
+            usage.get("bytes_synced", usage.get("BytesSynced", 0)),
+            usage.get("storage_bytes", usage.get("StorageBytes", 0)),
         ])
         print(f"OK: {datum_str} / {db_name} -> {usage}")
 
