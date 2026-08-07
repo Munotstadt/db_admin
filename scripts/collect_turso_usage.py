@@ -32,7 +32,8 @@ def get_env(name: str) -> str:
     if not value:
         print(f"FEHLER: Umgebungsvariable {name} fehlt.", file=sys.stderr)
         sys.exit(1)
-    return value
+    # Schutz vor unsichtbaren Zeilenumbrüchen/Leerzeichen aus Copy-Paste in GitHub Secrets
+    return value.strip()
 
 
 def api_get(path: str, token: str, params: dict | None = None) -> dict:
@@ -75,6 +76,7 @@ def load_existing_keys(path: str) -> set[tuple[str, str]]:
 def main() -> None:
     token = get_env("TURSO_API_TOKEN")
     org = get_env("TURSO_ORG_SLUG")
+    print(f"Verwende Org-Slug: '{org}' (Länge: {len(org)})")
 
     # Voller Vortag in UTC (00:00 bis 00:00), da der Cron einmal täglich läuft
     now_utc = datetime.now(timezone.utc)
