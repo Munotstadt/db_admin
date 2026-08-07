@@ -49,7 +49,7 @@ def api_get(path: str, token: str, params: dict | None = None) -> dict:
 
 def list_databases(org: str, token: str) -> list[str]:
     data = api_get(f"/organizations/{org}/databases", token)
-    return [db["name"] for db in data.get("databases", [])]
+    return [db["Name"] for db in data.get("databases", [])]
 
 
 def get_usage(org: str, db_name: str, token: str, day_start: datetime, day_end: datetime) -> dict:
