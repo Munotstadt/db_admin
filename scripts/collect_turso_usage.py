@@ -52,6 +52,69 @@ def list_databases(org: str, token: str) -> list[str]:
     return [db["Name"] for db in data.get("databases", [])]
 
 
+def _find_usage_fields(node) -> dict | None:
+    """Sucht rekursiv (case-insensitive) nach rows_read/rows_written/bytes_synced/storage_bytes,
+    egal wie die Turso API das Objekt verschachtelt oder benennt."""
+    wanted = {
+        "rows_read": None,
+        "rows_written": None,
+        "bytes_synced": None,
+        "storage_bytes": None,
+    }
+    found_any = False
+
+    def walk(obj):
+        nonlocal found_any
+        if isinstance(obj, dict):
+            lower_keys = {k.lower(): k for k in obj.keys()}
+            local_hit = False
+            for field in wanted:
+                key_variant = field.replace("_", "")
+                for lk, orig_k in lower_keys.items():
+                    if lk.replace("_", "") == key_variant:
+                        wanted[field] = obj[orig_k]
+                        local_hit = True
+                        found_any = True
+            if local_hit and all(v is not None for v in wanted.values()):
+                return
+            for v in obj.values():
+                walk(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                walk(item)
+
+    walk(node)
+    return wanted if found_any else None
+
+
+def _find_key_ci(node, target: str):
+    """BFS-Suche nach einem Key (case-insensitive) im JSON-Baum, gibt dessen Value zurück."""
+    from collections import deque
+    queue = deque([node])
+    while queue:
+        current = queue.popleft()
+        if isinstance(current, dict):
+            for k, v in current.items():
+                if k.lower() == target.lower():
+                    return v
+            for v in current.values():
+                queue.append(v)
+        elif isinstance(current, list):
+            for item in current:
+                queue.append(item)
+    return None
+
+
+def _extract_fields_from_dict(d: dict) -> dict:
+    wanted = {"rows_read": 0, "rows_written": 0, "bytes_synced": 0, "storage_bytes": 0}
+    lower_keys = {k.lower().replace("_", ""): k for k in d.keys()}
+    for field in list(wanted.keys()):
+        variant = field.replace("_", "")
+        if variant in lower_keys:
+            wanted[field] = d[lower_keys[variant]]
+    return wanted
+
+
 def get_usage(org: str, db_name: str, token: str, day_start: datetime, day_end: datetime) -> dict:
     params = {
         "from": day_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -59,14 +122,24 @@ def get_usage(org: str, db_name: str, token: str, day_start: datetime, day_end: 
     }
     data = api_get(f"/organizations/{org}/databases/{db_name}/usage", token, params)
 
-    # Die API-Antwortstruktur kann variieren (mit/ohne "database"-Wrapper,
-    # Gross-/Kleinschreibung der Keys). Robust gegen beides.
-    node = data.get("database", data)
-    total = node.get("total") or node.get("Total")
-    if total is None:
-        print(f"WARNUNG: Unerwartete Antwortstruktur für {db_name}: {data}", file=sys.stderr)
-        return {"rows_read": 0, "rows_written": 0, "bytes_synced": 0, "storage_bytes": 0}
-    return total
+    # 1. Bevorzugt: gezielt nach einem "total"-Knoten suchen (aggregierte Werte über alle Instanzen)
+    total_node = _find_key_ci(data, "total")
+    if isinstance(total_node, dict):
+        fields = _extract_fields_from_dict(total_node)
+        if any(v != 0 for v in fields.values()) or "rowsread".replace("_", "") in {
+            k.lower().replace("_", "") for k in total_node.keys()
+        }:
+            print(f"DEBUG {db_name}: total-Knoten gefunden: {total_node}")
+            return fields
+
+    # 2. Fallback: irgendwo im Baum nach den vier Feldern suchen (rekursiv)
+    result = _find_usage_fields(data)
+    if result is not None:
+        print(f"DEBUG {db_name}: Fallback-Suche gefunden: {result}")
+        return result
+
+    print(f"WARNUNG: Konnte Usage-Felder für {db_name} nicht finden. Rohantwort: {data}", file=sys.stderr)
+    return {"rows_read": 0, "rows_written": 0, "bytes_synced": 0, "storage_bytes": 0}
 
 
 def load_existing_keys(path: str) -> set[tuple[str, str]]:
