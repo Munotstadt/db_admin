@@ -94,6 +94,7 @@
   }
   svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
   .line { fill: none; stroke: var(--red); stroke-width: 2; }
+  .bar { fill: #3a3f4b; }
   .dot { fill: var(--red); }
   .dot-hit { fill: transparent; }
   .axis-label {
@@ -154,6 +155,72 @@ function parseDatum(d) {
   return new Date(Date.UTC(yyyy, mm - 1, dd));
 }
 
+function computeMonthlyCumulative(rows, key) {
+  let currentMonthKey = null;
+  let running = 0;
+  return rows.map(r => {
+    const d = parseDatum(r.Datum);
+    const monthKey = `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
+    if (monthKey !== currentMonthKey) {
+      currentMonthKey = monthKey;
+      running = 0;
+    }
+    running += Number(r[key]) || 0;
+    return running;
+  });
+}
+
+function buildComboChart(rows, key, formatter, id) {
+  const w = 600, h = 110, padL = 4, padR = 4, padT = 10, padB = 18;
+  const dailyValues = rows.map(r => Number(r[key]) || 0);
+  const cumulativeValues = computeMonthlyCumulative(rows, key);
+
+  const maxDaily = Math.max(...dailyValues, 1);
+  const maxCumulative = Math.max(...cumulativeValues, 1);
+  const innerH = h - padT - padB;
+  const n = rows.length;
+  const slot = (w - padL - padR) / n;
+  const barW = Math.max(slot * 0.5, 2);
+
+  // Säulen (Tageswert, eigene Skala)
+  let bars = '';
+  dailyValues.forEach((v, i) => {
+    const barH = (v / maxDaily) * innerH;
+    const x = padL + i * slot + (slot - barW) / 2;
+    const y = padT + innerH - barH;
+    bars += `<rect class="bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(barH, 0.5).toFixed(1)}"></rect>`;
+  });
+
+  // Linie (Monats-kumuliert, eigene Skala, auf gleicher Höhe normiert)
+  const linePoints = cumulativeValues.map((v, i) => {
+    const x = padL + i * slot + slot / 2;
+    const y = padT + (1 - v / maxCumulative) * innerH;
+    return { x, y, daily: dailyValues[i], cumulative: v, datum: rows[i]['Datum'] };
+  });
+  const pathD = linePoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+  let dots = '';
+  linePoints.forEach((p, i) => {
+    dots += `<circle class="dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5"></circle>`;
+    dots += `<circle class="dot-hit" data-idx="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="12"></circle>`;
+  });
+
+  const firstLabel = rows[0] ? rows[0]['Datum'] : '';
+  const lastLabel = rows[rows.length - 1] ? rows[rows.length - 1]['Datum'] : '';
+
+  const svg = `
+    <svg viewBox="0 0 ${w} ${h}" id="${id}" data-key="${key}">
+      <line class="grid-line" x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}"></line>
+      ${bars}
+      <path class="line" d="${pathD}"></path>
+      ${dots}
+      <text class="axis-label" x="${padL}" y="${h - 4}">${firstLabel}</text>
+      <text class="axis-label" x="${w - padR}" y="${h - 4}" text-anchor="end">${lastLabel}</text>
+    </svg>`;
+
+  return { svg, points: linePoints, formatter };
+}
+
 function buildSparkline(rows, key, formatter, id) {
   const w = 600, h = 90, padL = 4, padR = 4, padT = 10, padB = 18;
   const values = rows.map(r => Number(r[key]));
@@ -190,7 +257,7 @@ function buildSparkline(rows, key, formatter, id) {
   return { svg, points, formatter };
 }
 
-function attachTooltip(containerId, points, formatter, label) {
+function attachTooltip(containerId, points, formatter, label, showDaily) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.querySelectorAll('.dot-hit').forEach(hit => {
@@ -200,7 +267,11 @@ function attachTooltip(containerId, points, formatter, label) {
       tooltip.style.display = 'block';
       tooltip.style.left = (clientX + 12) + 'px';
       tooltip.style.top = (clientY - 30) + 'px';
-      tooltip.innerHTML = `${p.datum}<br>${label}: <b>${formatter(p.v)}</b>`;
+      if (showDaily) {
+        tooltip.innerHTML = `${p.datum}<br>Tag: <b>${formatter(p.daily)}</b><br>Monat (kum.): <b>${formatter(p.cumulative)}</b>`;
+      } else {
+        tooltip.innerHTML = `${p.datum}<br>${label}: <b>${formatter(p.v)}</b>`;
+      }
     };
     hit.addEventListener('mousemove', e => show(e.clientX, e.clientY));
     hit.addEventListener('mouseleave', () => tooltip.style.display = 'none');
@@ -252,20 +323,23 @@ function render(rowsByDb) {
     `;
 
     const charts = [
-      { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read / Tag' },
-      { key: 'RowsWritten', label: 'Rows Written', formatter: fmtInt, title: 'Rows Written / Tag' },
-      { key: 'StorageBytes', label: 'Storage', formatter: fmtBytes, title: 'Storage-Verlauf' },
+      { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
+      { key: 'RowsWritten', label: 'Rows Written', formatter: fmtInt, title: 'Rows Written — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
+      { key: 'StorageBytes', label: 'Storage', formatter: fmtBytes, title: 'Storage-Verlauf', combo: false },
     ];
 
     charts.forEach((c, cIdx) => {
-      if (rows.length < 2) return; // Sparkline braucht min. 2 Punkte
+      if (rows.length < 2) return; // Chart braucht min. 2 Punkte
       const chartId = `chart-${dbIdx}-${cIdx}`;
-      const { svg, points, formatter } = buildSparkline(rows, c.key, c.formatter, chartId);
+      const built = c.combo
+        ? buildComboChart(rows, c.key, c.formatter, chartId)
+        : buildSparkline(rows, c.key, c.formatter, chartId);
+      const { svg, points, formatter } = built;
       const block = document.createElement('div');
       block.className = 'chart-block';
       block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
       card.appendChild(block);
-      setTimeout(() => attachTooltip(chartId, points, formatter, c.label), 0);
+      setTimeout(() => attachTooltip(chartId, points, formatter, c.label, c.combo), 0);
     });
 
     content.appendChild(card);
