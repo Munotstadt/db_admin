@@ -9,11 +9,11 @@
 <style>
   :root {
     --red: #E30613;
-    --bg: #0f1115;
-    --card: #171a21;
-    --border: #262a33;
-    --text: #e8e9ec;
-    --muted: #8b909c;
+    --bg: #f7f7f5;
+    --card: #ffffff;
+    --border: #e2e2e0;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -29,6 +29,13 @@
     font-size: 22px;
     margin: 0 0 4px;
   }
+  h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    margin: 28px 0 10px;
+    color: var(--text);
+  }
   .subtitle {
     color: var(--muted);
     font-size: 13px;
@@ -41,6 +48,7 @@
     border-radius: 12px;
     padding: 16px;
     margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
   .db-header {
     display: flex;
@@ -66,8 +74,14 @@
     gap: 8px;
     margin-bottom: 14px;
   }
+  .metrics.five {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  @media (min-width: 480px) {
+    .metrics.five { grid-template-columns: repeat(3, 1fr); }
+  }
   .metric {
-    background: #11131a;
+    background: #fafaf8;
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px 10px;
@@ -85,6 +99,24 @@
     font-weight: 500;
   }
   .metric-value.accent { color: var(--red); }
+  .metric-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .progress {
+    margin-top: 5px;
+    height: 4px;
+    border-radius: 2px;
+    background: #ececea;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--red);
+    border-radius: 2px;
+  }
   .chart-block { margin-top: 10px; }
   .chart-title {
     font-size: 11px;
@@ -94,7 +126,7 @@
   }
   svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
   .line { fill: none; stroke: var(--red); stroke-width: 2; }
-  .bar { fill: #3a3f4b; }
+  .bar { fill: #c9c9c6; }
   .dot { fill: var(--red); }
   .dot-hit { fill: transparent; }
   .axis-label {
@@ -105,7 +137,8 @@
   .grid-line { stroke: var(--border); stroke-width: 1; }
   #tooltip {
     position: fixed;
-    background: #000;
+    background: #1a1a1a;
+    color: #fff;
     border: 1px solid var(--red);
     border-radius: 6px;
     padding: 6px 10px;
@@ -123,19 +156,48 @@
     padding: 40px 0;
     text-align: center;
   }
+  select {
+    width: 100%;
+    background: #ffffff;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    margin-bottom: 14px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
 </style>
 </head>
 <body>
 
 <h1>Turso Usage</h1>
 <div class="subtitle" id="subtitle">lädt …</div>
-<div id="content"></div>
+
+<h2>Gesamt (alle Datenbanken)</h2>
+<div id="summary"></div>
+
+<h2>Datenbank Details</h2>
+<select id="dbSelect"></select>
+<div id="dbDetail"></div>
+
 <div id="tooltip"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script>
 const CSV_URL = "data/turso_usage.csv"; // ggf. relativen Pfad anpassen
 const tooltip = document.getElementById("tooltip");
+
+// Monatslimits (Turso Free/Plan-Grenzen) - anpassen falls sich der Plan ändert
+const LIMITS = {
+  RowsRead: 500000000,
+  RowsWritten: 10000000,
+  BytesSynced: 3 * 1024 ** 3,   // 3 GB
+  StorageBytes: 5 * 1024 ** 3,  // 5 GB
+  Databases: 50,
+};
 
 function fmtBytes(n) {
   n = Number(n);
@@ -147,6 +209,15 @@ function fmtBytes(n) {
 
 function fmtInt(n) {
   return Number(n).toLocaleString('de-CH');
+}
+
+function fmtPct(value, limit) {
+  const pct = (value / limit) * 100;
+  return `${pct.toLocaleString('de-CH', { maximumFractionDigits: 1 })}%`;
+}
+
+function pctWidth(value, limit) {
+  return Math.min(100, (value / limit) * 100).toFixed(1);
 }
 
 function parseDatum(d) {
@@ -182,7 +253,6 @@ function buildComboChart(rows, key, formatter, id) {
   const slot = (w - padL - padR) / n;
   const barW = Math.max(slot * 0.5, 2);
 
-  // Säulen (Tageswert, eigene Skala)
   let bars = '';
   dailyValues.forEach((v, i) => {
     const barH = (v / maxDaily) * innerH;
@@ -191,7 +261,6 @@ function buildComboChart(rows, key, formatter, id) {
     bars += `<rect class="bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(barH, 0.5).toFixed(1)}"></rect>`;
   });
 
-  // Linie (Monats-kumuliert, eigene Skala, auf gleicher Höhe normiert)
   const linePoints = cumulativeValues.map((v, i) => {
     const x = padL + i * slot + slot / 2;
     const y = padT + (1 - v / maxCumulative) * innerH;
@@ -285,65 +354,160 @@ function attachTooltip(containerId, points, formatter, label, showDaily) {
   });
 }
 
-function render(rowsByDb) {
-  const content = document.getElementById('content');
-  content.innerHTML = '';
+function renderCharts(container, rows, idPrefix) {
+  const charts = [
+    { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
+    { key: 'RowsWritten', label: 'Rows Written', formatter: fmtInt, title: 'Rows Written — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
+    { key: 'StorageBytes', label: 'Storage', formatter: fmtBytes, title: 'Storage-Verlauf', combo: false },
+  ];
 
-  const dbNames = Object.keys(rowsByDb).sort();
-  dbNames.forEach((dbName, dbIdx) => {
-    const rows = rowsByDb[dbName].sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
-    const latest = rows[rows.length - 1];
-
-    const card = document.createElement('div');
-    card.className = 'db-card';
-
-    card.innerHTML = `
-      <div class="db-header">
-        <div class="db-name">${dbName}</div>
-        <div class="db-updated">Stand: ${latest.Datum}</div>
-      </div>
-      <div class="metrics">
-        <div class="metric">
-          <div class="metric-label">Rows Read</div>
-          <div class="metric-value accent">${fmtInt(latest.RowsRead)}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Rows Written</div>
-          <div class="metric-value accent">${fmtInt(latest.RowsWritten)}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Bytes Synced</div>
-          <div class="metric-value">${fmtBytes(latest.BytesSynced)}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Storage</div>
-          <div class="metric-value">${fmtBytes(latest.StorageBytes)}</div>
-        </div>
-      </div>
-    `;
-
-    const charts = [
-      { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
-      { key: 'RowsWritten', label: 'Rows Written', formatter: fmtInt, title: 'Rows Written — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
-      { key: 'StorageBytes', label: 'Storage', formatter: fmtBytes, title: 'Storage-Verlauf', combo: false },
-    ];
-
-    charts.forEach((c, cIdx) => {
-      if (rows.length < 2) return; // Chart braucht min. 2 Punkte
-      const chartId = `chart-${dbIdx}-${cIdx}`;
-      const built = c.combo
-        ? buildComboChart(rows, c.key, c.formatter, chartId)
-        : buildSparkline(rows, c.key, c.formatter, chartId);
-      const { svg, points, formatter } = built;
-      const block = document.createElement('div');
-      block.className = 'chart-block';
-      block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
-      card.appendChild(block);
-      setTimeout(() => attachTooltip(chartId, points, formatter, c.label, c.combo), 0);
-    });
-
-    content.appendChild(card);
+  charts.forEach((c, cIdx) => {
+    if (rows.length < 2) return;
+    const chartId = `${idPrefix}-${cIdx}`;
+    const built = c.combo
+      ? buildComboChart(rows, c.key, c.formatter, chartId)
+      : buildSparkline(rows, c.key, c.formatter, chartId);
+    const { svg, points, formatter } = built;
+    const block = document.createElement('div');
+    block.className = 'chart-block';
+    block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
+    container.appendChild(block);
+    setTimeout(() => attachTooltip(chartId, points, formatter, c.label, c.combo), 0);
   });
+}
+
+function buildDbCard(dbName, rows, idPrefix) {
+  const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
+  const latest = sorted[sorted.length - 1];
+
+  const card = document.createElement('div');
+  card.className = 'db-card';
+  card.innerHTML = `
+    <div class="db-header">
+      <div class="db-name">${dbName}</div>
+      <div class="db-updated">Stand: ${latest.Datum}</div>
+    </div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Rows Read</div>
+        <div class="metric-value accent">${fmtInt(latest.RowsRead)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Rows Written</div>
+        <div class="metric-value accent">${fmtInt(latest.RowsWritten)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Bytes Synced</div>
+        <div class="metric-value">${fmtBytes(latest.BytesSynced)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Storage</div>
+        <div class="metric-value">${fmtBytes(latest.StorageBytes)}</div>
+      </div>
+    </div>
+  `;
+  renderCharts(card, sorted, idPrefix);
+  return card;
+}
+
+function aggregateAcrossDbs(rowsByDb) {
+  // Für jedes Datum: Summe über alle Datenbanken, die an diesem Tag einen Eintrag haben
+  const byDate = {};
+  Object.values(rowsByDb).forEach(dbRows => {
+    dbRows.forEach(r => {
+      if (!byDate[r.Datum]) {
+        byDate[r.Datum] = { Datum: r.Datum, RowsRead: 0, RowsWritten: 0, BytesSynced: 0, StorageBytes: 0 };
+      }
+      byDate[r.Datum].RowsRead += Number(r.RowsRead) || 0;
+      byDate[r.Datum].RowsWritten += Number(r.RowsWritten) || 0;
+      byDate[r.Datum].BytesSynced += Number(r.BytesSynced) || 0;
+      byDate[r.Datum].StorageBytes += Number(r.StorageBytes) || 0;
+    });
+  });
+  return Object.values(byDate).sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
+}
+
+function currentStorageTotal(rowsByDb) {
+  // Summe des jeweils letzten (aktuellsten) Storage-Werts pro Datenbank
+  let total = 0;
+  Object.values(rowsByDb).forEach(dbRows => {
+    const sorted = dbRows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
+    total += Number(sorted[sorted.length - 1].StorageBytes) || 0;
+  });
+  return total;
+}
+
+function renderSummary(rowsByDb) {
+  const summary = document.getElementById('summary');
+  summary.innerHTML = '';
+
+  const aggRows = aggregateAcrossDbs(rowsByDb);
+  const dbCount = Object.keys(rowsByDb).length;
+  const latestDate = aggRows[aggRows.length - 1].Datum;
+
+  const monthReads = computeMonthlyCumulative(aggRows, 'RowsRead').slice(-1)[0];
+  const monthWrites = computeMonthlyCumulative(aggRows, 'RowsWritten').slice(-1)[0];
+  const monthSync = computeMonthlyCumulative(aggRows, 'BytesSynced').slice(-1)[0];
+  const storageTotal = currentStorageTotal(rowsByDb);
+
+  const card = document.createElement('div');
+  card.className = 'db-card';
+  card.innerHTML = `
+    <div class="db-header">
+      <div class="db-name">Alle Datenbanken (${dbCount})</div>
+      <div class="db-updated">Stand: ${latestDate}</div>
+    </div>
+    <div class="metrics five">
+      <div class="metric">
+        <div class="metric-label">Rows Read (Monat)</div>
+        <div class="metric-value accent">${fmtInt(monthReads)}</div>
+        <div class="metric-sub">${fmtPct(monthReads, LIMITS.RowsRead)} von ${fmtInt(LIMITS.RowsRead)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(monthReads, LIMITS.RowsRead)}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Rows Written (Monat)</div>
+        <div class="metric-value accent">${fmtInt(monthWrites)}</div>
+        <div class="metric-sub">${fmtPct(monthWrites, LIMITS.RowsWritten)} von ${fmtInt(LIMITS.RowsWritten)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(monthWrites, LIMITS.RowsWritten)}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Bytes Synced (Monat)</div>
+        <div class="metric-value">${fmtBytes(monthSync)}</div>
+        <div class="metric-sub">${fmtPct(monthSync, LIMITS.BytesSynced)} von ${fmtBytes(LIMITS.BytesSynced)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(monthSync, LIMITS.BytesSynced)}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Storage (aktuell)</div>
+        <div class="metric-value">${fmtBytes(storageTotal)}</div>
+        <div class="metric-sub">${fmtPct(storageTotal, LIMITS.StorageBytes)} von ${fmtBytes(LIMITS.StorageBytes)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(storageTotal, LIMITS.StorageBytes)}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Datenbanken</div>
+        <div class="metric-value">${dbCount} / ${LIMITS.Databases}</div>
+        <div class="metric-sub">${fmtPct(dbCount, LIMITS.Databases)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(dbCount, LIMITS.Databases)}%"></div></div>
+      </div>
+    </div>
+  `;
+  renderCharts(card, aggRows, 'summary-chart');
+  summary.appendChild(card);
+}
+
+function renderDbSelector(rowsByDb) {
+  const select = document.getElementById('dbSelect');
+  const detail = document.getElementById('dbDetail');
+  const dbNames = Object.keys(rowsByDb).sort();
+
+  select.innerHTML = dbNames.map(name => `<option value="${name}">${name}</option>`).join('');
+
+  const showDb = (name) => {
+    detail.innerHTML = '';
+    detail.appendChild(buildDbCard(name, rowsByDb[name], `db-${name.replace(/[^a-z0-9]/gi, '_')}`));
+  };
+
+  select.addEventListener('change', () => showDb(select.value));
+  if (dbNames.length > 0) showDb(dbNames[0]);
 }
 
 Papa.parse(CSV_URL, {
@@ -354,7 +518,7 @@ Papa.parse(CSV_URL, {
   complete: (results) => {
     const rows = results.data.filter(r => r.Datenbank);
     if (rows.length === 0) {
-      document.getElementById('content').innerHTML = '<div class="empty-state">Noch keine Daten vorhanden.</div>';
+      document.getElementById('summary').innerHTML = '<div class="empty-state">Noch keine Daten vorhanden.</div>';
       document.getElementById('subtitle').textContent = 'keine Daten';
       return;
     }
@@ -365,10 +529,11 @@ Papa.parse(CSV_URL, {
     });
     document.getElementById('subtitle').textContent =
       `${Object.keys(rowsByDb).length} Datenbank(en) · letztes Update ${rows[rows.length - 1].Datum}`;
-    render(rowsByDb);
+    renderSummary(rowsByDb);
+    renderDbSelector(rowsByDb);
   },
   error: (err) => {
-    document.getElementById('content').innerHTML =
+    document.getElementById('summary').innerHTML =
       `<div class="empty-state">Fehler beim Laden der CSV: ${err.message}</div>`;
   }
 });
