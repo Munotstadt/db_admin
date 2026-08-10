@@ -6,3 +6,7 @@ Datum;Datenbank;RowsRead;RowsWritten;BytesSynced;StorageBytes
 08.08.2026;munotstadtenergydb;0;0;0;0
 08.08.2026;munotstadtmeteodb;294717;2476;0;0
 08.08.2026;munotstadtsecuritydb;53173;7218;0;0
+09.08.2026;munostadtadtseetstrasse52bdb;317;30;0;0
+09.08.2026;munotstadtenergydb;6867;2640;0;0
+09.08.2026;munotstadtmeteodb;76853;2262;0;0
+09.08.2026;munotstadtsecuritydb;1273749;455;0;0
