@@ -156,6 +156,56 @@
     padding: 40px 0;
     text-align: center;
   }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 0 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 18px;
+  }
+  .brand {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--text);
+  }
+  .brand span { color: var(--red); }
+  .tabs {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .tabs a, .tabs button {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: none;
+    cursor: pointer;
+  }
+  .tabs a.active {
+    color: var(--red);
+    border-color: var(--border);
+    background: #fff;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  .secondary {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  .secondary:active { background: #f0f0ee; }
   select {
     width: 100%;
     background: #ffffff;
@@ -173,8 +223,18 @@
 </head>
 <body>
 
-<h1>Turso Usage</h1>
+<header class="topbar">
+  <div class="brand">Turso <span>Usage</span></div>
+  <nav class="tabs">
+    <button id="refreshBtn" class="secondary">Aktualisieren</button>
+  </nav>
+</header>
+
+<main>
 <div class="subtitle" id="subtitle">lädt …</div>
+
+<h2>Forecast (Hochrechnung Monat)</h2>
+<div id="forecast"></div>
 
 <h2>Gesamt (alle Datenbanken)</h2>
 <div id="summary"></div>
@@ -182,6 +242,7 @@
 <h2>Datenbank Details</h2>
 <select id="dbSelect"></select>
 <div id="dbDetail"></div>
+</main>
 
 <div id="tooltip"></div>
 
@@ -437,6 +498,42 @@ function currentStorageTotal(rowsByDb) {
   return total;
 }
 
+function renderForecast(aggRows) {
+  const forecast = document.getElementById('forecast');
+  forecast.innerHTML = '';
+
+  const last30 = aggRows.slice(-30);
+  const avgReads = last30.reduce((sum, r) => sum + (Number(r.RowsRead) || 0), 0) / last30.length;
+  const avgWrites = last30.reduce((sum, r) => sum + (Number(r.RowsWritten) || 0), 0) / last30.length;
+
+  const forecastReads = avgReads * 30.5;
+  const forecastWrites = avgWrites * 30.5;
+
+  const card = document.createElement('div');
+  card.className = 'db-card';
+  card.innerHTML = `
+    <div class="db-header">
+      <div class="db-name">Hochrechnung</div>
+      <div class="db-updated">Ø letzte ${last30.length} Tage × 30.5</div>
+    </div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Rows Read (Forecast)</div>
+        <div class="metric-value accent">${fmtInt(Math.round(forecastReads))}</div>
+        <div class="metric-sub">${fmtPct(forecastReads, LIMITS.RowsRead)} von ${fmtInt(LIMITS.RowsRead)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(forecastReads, LIMITS.RowsRead)}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Rows Written (Forecast)</div>
+        <div class="metric-value accent">${fmtInt(Math.round(forecastWrites))}</div>
+        <div class="metric-sub">${fmtPct(forecastWrites, LIMITS.RowsWritten)} von ${fmtInt(LIMITS.RowsWritten)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(forecastWrites, LIMITS.RowsWritten)}%"></div></div>
+      </div>
+    </div>
+  `;
+  forecast.appendChild(card);
+}
+
 function renderSummary(rowsByDb) {
   const summary = document.getElementById('summary');
   summary.innerHTML = '';
@@ -510,33 +607,40 @@ function renderDbSelector(rowsByDb) {
   if (dbNames.length > 0) showDb(dbNames[0]);
 }
 
-Papa.parse(CSV_URL, {
-  download: true,
-  header: true,
-  delimiter: ";",
-  skipEmptyLines: true,
-  complete: (results) => {
-    const rows = results.data.filter(r => r.Datenbank);
-    if (rows.length === 0) {
-      document.getElementById('summary').innerHTML = '<div class="empty-state">Noch keine Daten vorhanden.</div>';
-      document.getElementById('subtitle').textContent = 'keine Daten';
-      return;
+function loadData() {
+  document.getElementById('subtitle').textContent = 'lädt …';
+  Papa.parse(CSV_URL + '?t=' + Date.now(), {
+    download: true,
+    header: true,
+    delimiter: ";",
+    skipEmptyLines: true,
+    complete: (results) => {
+      const rows = results.data.filter(r => r.Datenbank);
+      if (rows.length === 0) {
+        document.getElementById('summary').innerHTML = '<div class="empty-state">Noch keine Daten vorhanden.</div>';
+        document.getElementById('subtitle').textContent = 'keine Daten';
+        return;
+      }
+      const rowsByDb = {};
+      rows.forEach(r => {
+        if (!rowsByDb[r.Datenbank]) rowsByDb[r.Datenbank] = [];
+        rowsByDb[r.Datenbank].push(r);
+      });
+      document.getElementById('subtitle').textContent =
+        `${Object.keys(rowsByDb).length} Datenbank(en) · letztes Update ${rows[rows.length - 1].Datum}`;
+      renderForecast(aggregateAcrossDbs(rowsByDb));
+      renderSummary(rowsByDb);
+      renderDbSelector(rowsByDb);
+    },
+    error: (err) => {
+      document.getElementById('summary').innerHTML =
+        `<div class="empty-state">Fehler beim Laden der CSV: ${err.message}</div>`;
     }
-    const rowsByDb = {};
-    rows.forEach(r => {
-      if (!rowsByDb[r.Datenbank]) rowsByDb[r.Datenbank] = [];
-      rowsByDb[r.Datenbank].push(r);
-    });
-    document.getElementById('subtitle').textContent =
-      `${Object.keys(rowsByDb).length} Datenbank(en) · letztes Update ${rows[rows.length - 1].Datum}`;
-    renderSummary(rowsByDb);
-    renderDbSelector(rowsByDb);
-  },
-  error: (err) => {
-    document.getElementById('summary').innerHTML =
-      `<div class="empty-state">Fehler beim Laden der CSV: ${err.message}</div>`;
-  }
-});
+  });
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+loadData();
 </script>
 </body>
 </html>
