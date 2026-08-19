@@ -54,8 +54,16 @@ def api_get(path: str, token: str, params: dict | None = None) -> dict:
     return resp.json()
 
 
-def list_projects(token: str) -> list[dict]:
-    data = api_get("/projects", token, params={"limit": 100})
+def get_env_optional(name: str) -> str | None:
+    value = os.environ.get(name)
+    return value.strip() if value else None
+
+
+def list_projects(token: str, org_id: str | None) -> list[dict]:
+    params = {"limit": 100}
+    if org_id:
+        params["org_id"] = org_id
+    data = api_get("/projects", token, params=params)
     return data.get("projects", [])
 
 
@@ -85,6 +93,7 @@ def load_existing_keys(path: str) -> set[tuple[str, str]]:
 
 def main() -> None:
     token = get_env("NEON_API_KEY")
+    org_id = get_env_optional("NEON_ORG_ID")
 
     today_str = datetime.now(timezone.utc).strftime("%d.%m.%Y")
 
@@ -92,7 +101,7 @@ def main() -> None:
     existing_keys = load_existing_keys(CSV_PATH)
     file_exists = os.path.exists(CSV_PATH)
 
-    projects = list_projects(token)
+    projects = list_projects(token, org_id)
     if not projects:
         print("Keine Neon-Projekte gefunden.")
         return
