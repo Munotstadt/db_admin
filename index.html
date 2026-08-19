@@ -189,11 +189,12 @@
     background: none;
     cursor: pointer;
   }
-  .tabs a.active {
+  .tabs a.active, .tabs button.active {
     color: var(--red);
     border-color: var(--border);
     background: #fff;
   }
+  .tabs button { font-family: 'IBM Plex Mono', monospace; }
   main { max-width: 900px; margin: 0 auto; }
   .secondary {
     font-family: 'IBM Plex Mono', monospace;
@@ -224,8 +225,10 @@
 <body>
 
 <header class="topbar">
-  <div class="brand">Turso <span>Usage</span></div>
+  <div class="brand">DB <span>Admin</span></div>
   <nav class="tabs">
+    <button id="tabTurso" class="active" data-hosting="turso">Turso</button>
+    <button id="tabNeon" data-hosting="neon">Neon</button>
     <button id="refreshBtn" class="secondary">Aktualisieren</button>
   </nav>
 </header>
@@ -233,6 +236,7 @@
 <main>
 <div class="subtitle" id="subtitle">lädt …</div>
 
+<div id="tursoView">
 <h2>Forecast (Hochrechnung Monat)</h2>
 <div id="forecast"></div>
 
@@ -242,6 +246,16 @@
 <h2>Datenbank Details</h2>
 <select id="dbSelect"></select>
 <div id="dbDetail"></div>
+</div>
+
+<div id="neonView" style="display:none;">
+<h2>Gesamt (alle Projekte)</h2>
+<div id="neonSummary"></div>
+
+<h2>Projekt Details</h2>
+<select id="neonProjectSelect"></select>
+<div id="neonProjectDetail"></div>
+</div>
 </main>
 
 <div id="tooltip"></div>
@@ -249,6 +263,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script>
 const CSV_URL = "data/turso_usage.csv"; // ggf. relativen Pfad anpassen
+const NEON_CSV_URL = "data/neon_usage.csv";
 const tooltip = document.getElementById("tooltip");
 
 // Monatslimits (Turso Free/Plan-Grenzen) - anpassen falls sich der Plan ändert
@@ -607,6 +622,179 @@ function renderDbSelector(rowsByDb) {
   if (dbNames.length > 0) showDb(dbNames[0]);
 }
 
+// ---------- Neon ----------
+
+function fmtHours(seconds) {
+  return `${(Number(seconds) / 3600).toLocaleString('de-CH', { maximumFractionDigits: 1 })} h`;
+}
+
+function buildNeonDbCard(projectName, rows, idPrefix) {
+  const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
+  const latest = sorted[sorted.length - 1];
+
+  const card = document.createElement('div');
+  card.className = 'db-card';
+  card.innerHTML = `
+    <div class="db-header">
+      <div class="db-name">${projectName}</div>
+      <div class="db-updated">Stand: ${latest.Datum}</div>
+    </div>
+    <div class="metrics five">
+      <div class="metric">
+        <div class="metric-label">Compute Time (Periode)</div>
+        <div class="metric-value accent">${fmtHours(latest.ComputeTimeSeconds)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Active Time (Periode)</div>
+        <div class="metric-value">${fmtHours(latest.ActiveTimeSeconds)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Written Data (Periode)</div>
+        <div class="metric-value">${fmtBytes(latest.WrittenDataBytes)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Data Transfer (Periode)</div>
+        <div class="metric-value">${fmtBytes(latest.DataTransferBytes)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Storage (aktuell)</div>
+        <div class="metric-value">${fmtBytes(latest.StorageBytes)}</div>
+      </div>
+    </div>
+  `;
+
+  if (sorted.length >= 2) {
+    const charts = [
+      { key: 'ComputeTimeSeconds', formatter: fmtHours, title: 'Compute Time — Verlauf (kumuliert seit Periodenbeginn, Reset durch Neon)' },
+      { key: 'WrittenDataBytes', formatter: fmtBytes, title: 'Written Data — Verlauf' },
+      { key: 'StorageBytes', formatter: fmtBytes, title: 'Storage — Verlauf' },
+    ];
+    charts.forEach((c, cIdx) => {
+      const chartId = `${idPrefix}-${cIdx}`;
+      const { svg, points, formatter } = buildSparkline(sorted, c.key, c.formatter, chartId);
+      const block = document.createElement('div');
+      block.className = 'chart-block';
+      block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
+      card.appendChild(block);
+      setTimeout(() => attachTooltip(chartId, points, formatter, c.title, false), 0);
+    });
+  }
+
+  return card;
+}
+
+function renderNeonSummary(rowsByProject) {
+  const summary = document.getElementById('neonSummary');
+  summary.innerHTML = '';
+
+  const projectCount = Object.keys(rowsByProject).length;
+  let totalCompute = 0, totalActive = 0, totalWritten = 0, totalTransfer = 0, totalStorage = 0;
+  let latestDate = '';
+
+  Object.values(rowsByProject).forEach(rows => {
+    const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
+    const latest = sorted[sorted.length - 1];
+    totalCompute += Number(latest.ComputeTimeSeconds) || 0;
+    totalActive += Number(latest.ActiveTimeSeconds) || 0;
+    totalWritten += Number(latest.WrittenDataBytes) || 0;
+    totalTransfer += Number(latest.DataTransferBytes) || 0;
+    totalStorage += Number(latest.StorageBytes) || 0;
+    if (!latestDate || latest.Datum > latestDate) latestDate = latest.Datum;
+  });
+
+  const card = document.createElement('div');
+  card.className = 'db-card';
+  card.innerHTML = `
+    <div class="db-header">
+      <div class="db-name">Alle Projekte (${projectCount})</div>
+      <div class="db-updated">Stand: ${latestDate}</div>
+    </div>
+    <div class="metrics five">
+      <div class="metric">
+        <div class="metric-label">Compute Time (Periode)</div>
+        <div class="metric-value accent">${fmtHours(totalCompute)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Active Time (Periode)</div>
+        <div class="metric-value">${fmtHours(totalActive)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Written Data (Periode)</div>
+        <div class="metric-value">${fmtBytes(totalWritten)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Data Transfer (Periode)</div>
+        <div class="metric-value">${fmtBytes(totalTransfer)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Storage (aktuell)</div>
+        <div class="metric-value">${fmtBytes(totalStorage)}</div>
+      </div>
+    </div>
+    <div class="metric-sub" style="margin-top:8px;">Hinweis: Neon-Plan-Limits sind noch nicht hinterlegt (im Gegensatz zu den Turso-Kacheln oben ohne %-Anzeige). Sag mir eure Grenzwerte, dann ergänze ich die Prozent-Balken.</div>
+  `;
+  summary.appendChild(card);
+}
+
+function renderNeonProjectSelector(rowsByProject) {
+  const select = document.getElementById('neonProjectSelect');
+  const detail = document.getElementById('neonProjectDetail');
+  const names = Object.keys(rowsByProject).sort();
+
+  select.innerHTML = names.map(name => `<option value="${name}">${name}</option>`).join('');
+
+  const showProject = (name) => {
+    detail.innerHTML = '';
+    detail.appendChild(buildNeonDbCard(name, rowsByProject[name], `neon-${name.replace(/[^a-z0-9]/gi, '_')}`));
+  };
+
+  select.addEventListener('change', () => showProject(select.value));
+  if (names.length > 0) showProject(names[0]);
+}
+
+function loadNeonData() {
+  Papa.parse(NEON_CSV_URL + '?t=' + Date.now(), {
+    download: true,
+    header: true,
+    delimiter: ";",
+    skipEmptyLines: true,
+    complete: (results) => {
+      const rows = results.data.filter(r => r.Projekt);
+      if (rows.length === 0) {
+        document.getElementById('neonSummary').innerHTML = '<div class="empty-state">Noch keine Neon-Daten vorhanden.</div>';
+        return;
+      }
+      const rowsByProject = {};
+      rows.forEach(r => {
+        if (!rowsByProject[r.Projekt]) rowsByProject[r.Projekt] = [];
+        rowsByProject[r.Projekt].push(r);
+      });
+      renderNeonSummary(rowsByProject);
+      renderNeonProjectSelector(rowsByProject);
+    },
+    error: (err) => {
+      document.getElementById('neonSummary').innerHTML =
+        `<div class="empty-state">Fehler beim Laden der Neon-CSV: ${err.message}</div>`;
+    }
+  });
+}
+
+// ---------- Tab-Umschaltung ----------
+
+function switchHosting(hosting) {
+  const isTurso = hosting === 'turso';
+  document.getElementById('tursoView').style.display = isTurso ? '' : 'none';
+  document.getElementById('neonView').style.display = isTurso ? 'none' : '';
+  document.getElementById('tabTurso').classList.toggle('active', isTurso);
+  document.getElementById('tabNeon').classList.toggle('active', !isTurso);
+  if (!isTurso) loadNeonData();
+}
+
+document.getElementById('tabTurso').addEventListener('click', () => switchHosting('turso'));
+document.getElementById('tabNeon').addEventListener('click', () => switchHosting('neon'));
+
+// ---------- Turso Ladevorgang ----------
+
 function loadData() {
   document.getElementById('subtitle').textContent = 'lädt …';
   Papa.parse(CSV_URL + '?t=' + Date.now(), {
@@ -639,7 +827,14 @@ function loadData() {
   });
 }
 
-document.getElementById('refreshBtn').addEventListener('click', loadData);
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  const neonActive = document.getElementById('tabNeon').classList.contains('active');
+  if (neonActive) {
+    loadNeonData();
+  } else {
+    loadData();
+  }
+});
 loadData();
 </script>
 </body>
