@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Turso Usage Dashboard</title>
+<title>DB Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -622,6 +622,15 @@ function renderDbSelector(rowsByDb) {
   if (dbNames.length > 0) showDb(dbNames[0]);
 }
 
+// Neon Free-Plan-Limits (pro Projekt, ausser Projekte-Limit das account-weit gilt)
+const NEON_LIMITS = {
+  StorageBytesPerProject: 0.5 * 1024 ** 3,   // 512 MB
+  ComputeHoursPerProject: 100,               // CU-Stunden/Monat
+  TransferBytesPerProject: 5 * 1024 ** 3,    // 5 GB
+  MaxProjects: 100,
+  MaxBranchesPerProject: 10,                 // aktuell nicht erfasst, siehe README
+};
+
 // ---------- Neon ----------
 
 function fmtHours(seconds) {
@@ -631,6 +640,10 @@ function fmtHours(seconds) {
 function buildNeonDbCard(projectName, rows, idPrefix) {
   const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
   const latest = sorted[sorted.length - 1];
+  const computeSeconds = Number(latest.ComputeTimeSeconds) || 0;
+  const computeLimitSeconds = NEON_LIMITS.ComputeHoursPerProject * 3600;
+  const storageBytes = Number(latest.StorageBytes) || 0;
+  const transferBytes = Number(latest.DataTransferBytes) || 0;
 
   const card = document.createElement('div');
   card.className = 'db-card';
@@ -642,7 +655,9 @@ function buildNeonDbCard(projectName, rows, idPrefix) {
     <div class="metrics five">
       <div class="metric">
         <div class="metric-label">Compute Time (Periode)</div>
-        <div class="metric-value accent">${fmtHours(latest.ComputeTimeSeconds)}</div>
+        <div class="metric-value accent">${(computeSeconds / 3600).toLocaleString('de-CH', { maximumFractionDigits: 1 })} CU-h</div>
+        <div class="metric-sub">${fmtPct(computeSeconds, computeLimitSeconds)} von ${NEON_LIMITS.ComputeHoursPerProject} CU-h</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(computeSeconds, computeLimitSeconds)}%"></div></div>
       </div>
       <div class="metric">
         <div class="metric-label">Active Time (Periode)</div>
@@ -654,11 +669,15 @@ function buildNeonDbCard(projectName, rows, idPrefix) {
       </div>
       <div class="metric">
         <div class="metric-label">Data Transfer (Periode)</div>
-        <div class="metric-value">${fmtBytes(latest.DataTransferBytes)}</div>
+        <div class="metric-value">${fmtBytes(transferBytes)}</div>
+        <div class="metric-sub">${fmtPct(transferBytes, NEON_LIMITS.TransferBytesPerProject)} von ${fmtBytes(NEON_LIMITS.TransferBytesPerProject)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(transferBytes, NEON_LIMITS.TransferBytesPerProject)}%"></div></div>
       </div>
       <div class="metric">
         <div class="metric-label">Storage (aktuell)</div>
-        <div class="metric-value">${fmtBytes(latest.StorageBytes)}</div>
+        <div class="metric-value">${fmtBytes(storageBytes)}</div>
+        <div class="metric-sub">${fmtPct(storageBytes, NEON_LIMITS.StorageBytesPerProject)} von ${fmtBytes(NEON_LIMITS.StorageBytesPerProject)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(storageBytes, NEON_LIMITS.StorageBytesPerProject)}%"></div></div>
       </div>
     </div>
   `;
@@ -702,6 +721,13 @@ function renderNeonSummary(rowsByProject) {
     if (!latestDate || latest.Datum > latestDate) latestDate = latest.Datum;
   });
 
+  // Kapazität = Limit pro Projekt × Anzahl Projekte (Free-Plan-Limits gelten pro Projekt)
+  const storageLimitTotal = projectCount * NEON_LIMITS.StorageBytesPerProject;
+  const computeLimitTotalSeconds = projectCount * NEON_LIMITS.ComputeHoursPerProject * 3600;
+  const transferLimitTotal = projectCount * NEON_LIMITS.TransferBytesPerProject;
+  const totalComputeHours = totalCompute / 3600;
+  const computeLimitTotalHours = projectCount * NEON_LIMITS.ComputeHoursPerProject;
+
   const card = document.createElement('div');
   card.className = 'db-card';
   card.innerHTML = `
@@ -712,7 +738,9 @@ function renderNeonSummary(rowsByProject) {
     <div class="metrics five">
       <div class="metric">
         <div class="metric-label">Compute Time (Periode)</div>
-        <div class="metric-value accent">${fmtHours(totalCompute)}</div>
+        <div class="metric-value accent">${totalComputeHours.toLocaleString('de-CH', { maximumFractionDigits: 1 })} CU-h</div>
+        <div class="metric-sub">${fmtPct(totalCompute, computeLimitTotalSeconds)} von ${computeLimitTotalHours.toLocaleString('de-CH')} CU-h</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(totalCompute, computeLimitTotalSeconds)}%"></div></div>
       </div>
       <div class="metric">
         <div class="metric-label">Active Time (Periode)</div>
@@ -725,13 +753,23 @@ function renderNeonSummary(rowsByProject) {
       <div class="metric">
         <div class="metric-label">Data Transfer (Periode)</div>
         <div class="metric-value">${fmtBytes(totalTransfer)}</div>
+        <div class="metric-sub">${fmtPct(totalTransfer, transferLimitTotal)} von ${fmtBytes(transferLimitTotal)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(totalTransfer, transferLimitTotal)}%"></div></div>
       </div>
       <div class="metric">
         <div class="metric-label">Storage (aktuell)</div>
         <div class="metric-value">${fmtBytes(totalStorage)}</div>
+        <div class="metric-sub">${fmtPct(totalStorage, storageLimitTotal)} von ${fmtBytes(storageLimitTotal)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(totalStorage, storageLimitTotal)}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Projekte</div>
+        <div class="metric-value">${projectCount} / ${NEON_LIMITS.MaxProjects}</div>
+        <div class="metric-sub">${fmtPct(projectCount, NEON_LIMITS.MaxProjects)}</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(projectCount, NEON_LIMITS.MaxProjects)}%"></div></div>
       </div>
     </div>
-    <div class="metric-sub" style="margin-top:8px;">Hinweis: Neon-Plan-Limits sind noch nicht hinterlegt (im Gegensatz zu den Turso-Kacheln oben ohne %-Anzeige). Sag mir eure Grenzwerte, dann ergänze ich die Prozent-Balken.</div>
+    <div class="metric-sub" style="margin-top:8px;">Storage/Compute/Transfer-Limits gelten pro Projekt (Free-Plan) und werden hier als Summe über alle ${projectCount} Projekte dargestellt. Branches-Limit (10/Projekt) wird aktuell nicht erfasst.</div>
   `;
   summary.appendChild(card);
 }
