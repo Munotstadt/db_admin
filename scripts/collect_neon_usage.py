@@ -48,6 +48,8 @@ def api_get(path: str, token: str, params: dict | None = None) -> dict:
         params=params,
         timeout=30,
     )
+    if not resp.ok:
+        print(f"FEHLER {resp.status_code} bei {path}: {resp.text}", file=sys.stderr)
     resp.raise_for_status()
     return resp.json()
 
