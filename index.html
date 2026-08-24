@@ -229,6 +229,7 @@
   <nav class="tabs">
     <button id="tabTurso" class="active" data-hosting="turso">Turso</button>
     <button id="tabNeon" data-hosting="neon">Neon</button>
+    <button id="tabGithub" data-hosting="github">GitHub</button>
     <button id="refreshBtn" class="secondary">Aktualisieren</button>
   </nav>
 </header>
@@ -256,6 +257,11 @@
 <select id="neonProjectSelect"></select>
 <div id="neonProjectDetail"></div>
 </div>
+
+<div id="githubView" style="display:none;">
+<h2>Organisation</h2>
+<div id="githubSummary"></div>
+</div>
 </main>
 
 <div id="tooltip"></div>
@@ -264,6 +270,7 @@
 <script>
 const CSV_URL = "data/turso_usage.csv"; // ggf. relativen Pfad anpassen
 const NEON_CSV_URL = "data/neon_usage.csv";
+const GITHUB_CSV_URL = "data/github_usage.csv";
 const tooltip = document.getElementById("tooltip");
 
 // Monatslimits (Turso Free/Plan-Grenzen) - anpassen falls sich der Plan ändert
@@ -817,19 +824,118 @@ function loadNeonData() {
   });
 }
 
+// ---------- GitHub ----------
+
+// Actions-Minuten-Limit gilt nur für private Repos auf zahlungspflichtigen Runnern;
+// bei public Repos/Free-Runnern unbegrenzt. Hier als Referenzwert für Free-Plan Team/Org.
+const GITHUB_LIMITS = {
+  IncludedMinutesFallback: 3000, // wird von der API überschrieben, falls vorhanden
+  StorageGB: 2, // Free-Plan Shared-Storage-Richtwert
+};
+
+function buildGithubCard(rows) {
+  const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
+  const latest = sorted[sorted.length - 1];
+
+  const totalMinutes = Number(latest.TotalMinutesUsed) || 0;
+  const includedMinutes = Number(latest.IncludedMinutes) || GITHUB_LIMITS.IncludedMinutesFallback;
+  const paidMinutes = Number(latest.PaidMinutesUsed) || 0;
+  const storageGB = Number(latest.StorageEstimateGB) || 0;
+  const cacheBytes = Number(latest.CacheBytes) || 0;
+
+  const card = document.createElement('div');
+  card.className = 'db-card';
+  card.innerHTML = `
+    <div class="db-header">
+      <div class="db-name">Actions &amp; Storage</div>
+      <div class="db-updated">Stand: ${latest.Datum}</div>
+    </div>
+    <div class="metrics five">
+      <div class="metric">
+        <div class="metric-label">Actions Minuten (Periode)</div>
+        <div class="metric-value accent">${fmtInt(totalMinutes)} min</div>
+        <div class="metric-sub">${fmtPct(totalMinutes, includedMinutes)} von ${fmtInt(includedMinutes)} min</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(totalMinutes, includedMinutes)}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Davon kostenpflichtig</div>
+        <div class="metric-value">${fmtInt(paidMinutes)} min</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Ubuntu / macOS / Windows</div>
+        <div class="metric-value" style="font-size:13px;">${fmtInt(latest.MinutesUbuntu)} / ${fmtInt(latest.MinutesMacOS)} / ${fmtInt(latest.MinutesWindows)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Shared Storage (Schätzung)</div>
+        <div class="metric-value">${storageGB.toLocaleString('de-CH', { maximumFractionDigits: 2 })} GB</div>
+        <div class="metric-sub">${fmtPct(storageGB, GITHUB_LIMITS.StorageGB)} von ${GITHUB_LIMITS.StorageGB} GB</div>
+        <div class="progress"><div class="progress-fill" style="width:${pctWidth(storageGB, GITHUB_LIMITS.StorageGB)}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Actions Cache</div>
+        <div class="metric-value">${fmtBytes(cacheBytes)}</div>
+      </div>
+    </div>
+  `;
+
+  if (sorted.length >= 2) {
+    const charts = [
+      { key: 'TotalMinutesUsed', formatter: fmtInt, title: 'Actions Minuten — Verlauf (kumuliert seit Periodenbeginn)' },
+      { key: 'CacheBytes', formatter: fmtBytes, title: 'Actions Cache — Verlauf' },
+    ];
+    charts.forEach((c, cIdx) => {
+      const chartId = `github-${cIdx}`;
+      const { svg, points, formatter } = buildSparkline(sorted, c.key, c.formatter, chartId);
+      const block = document.createElement('div');
+      block.className = 'chart-block';
+      block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
+      card.appendChild(block);
+      setTimeout(() => attachTooltip(chartId, points, formatter, c.title, false), 0);
+    });
+  }
+
+  return card;
+}
+
+function loadGithubData() {
+  Papa.parse(GITHUB_CSV_URL + '?t=' + Date.now(), {
+    download: true,
+    header: true,
+    delimiter: ";",
+    skipEmptyLines: true,
+    complete: (results) => {
+      const rows = results.data.filter(r => r.Datum);
+      const summary = document.getElementById('githubSummary');
+      if (rows.length === 0) {
+        summary.innerHTML = '<div class="empty-state">Noch keine GitHub-Daten vorhanden.</div>';
+        return;
+      }
+      summary.innerHTML = '';
+      summary.appendChild(buildGithubCard(rows));
+    },
+    error: (err) => {
+      document.getElementById('githubSummary').innerHTML =
+        `<div class="empty-state">Fehler beim Laden der GitHub-CSV: ${err.message}</div>`;
+    }
+  });
+}
+
 // ---------- Tab-Umschaltung ----------
 
 function switchHosting(hosting) {
-  const isTurso = hosting === 'turso';
-  document.getElementById('tursoView').style.display = isTurso ? '' : 'none';
-  document.getElementById('neonView').style.display = isTurso ? 'none' : '';
-  document.getElementById('tabTurso').classList.toggle('active', isTurso);
-  document.getElementById('tabNeon').classList.toggle('active', !isTurso);
-  if (!isTurso) loadNeonData();
+  document.getElementById('tursoView').style.display = hosting === 'turso' ? '' : 'none';
+  document.getElementById('neonView').style.display = hosting === 'neon' ? '' : 'none';
+  document.getElementById('githubView').style.display = hosting === 'github' ? '' : 'none';
+  document.getElementById('tabTurso').classList.toggle('active', hosting === 'turso');
+  document.getElementById('tabNeon').classList.toggle('active', hosting === 'neon');
+  document.getElementById('tabGithub').classList.toggle('active', hosting === 'github');
+  if (hosting === 'neon') loadNeonData();
+  if (hosting === 'github') loadGithubData();
 }
 
 document.getElementById('tabTurso').addEventListener('click', () => switchHosting('turso'));
 document.getElementById('tabNeon').addEventListener('click', () => switchHosting('neon'));
+document.getElementById('tabGithub').addEventListener('click', () => switchHosting('github'));
 
 // ---------- Turso Ladevorgang ----------
 
@@ -866,9 +972,10 @@ function loadData() {
 }
 
 document.getElementById('refreshBtn').addEventListener('click', () => {
-  const neonActive = document.getElementById('tabNeon').classList.contains('active');
-  if (neonActive) {
+  if (document.getElementById('tabNeon').classList.contains('active')) {
     loadNeonData();
+  } else if (document.getElementById('tabGithub').classList.contains('active')) {
+    loadGithubData();
   } else {
     loadData();
   }
