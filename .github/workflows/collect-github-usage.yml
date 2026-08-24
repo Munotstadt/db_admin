@@ -1,0 +1,43 @@
+name: Collect GitHub Usage
+
+on:
+  schedule:
+    - cron: "10 3 * * *"  # kurz nach Turso/Neon-Collectors
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Collect usage
+        env:
+          GH_BILLING_TOKEN: ${{ secrets.GH_BILLING_TOKEN }}
+          GH_ORG: ${{ secrets.GH_ORG }}
+        run: python scripts/collect_github_usage.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/github_usage.csv
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen."
+            exit 0
+          fi
+          git pull --rebase --autostash origin main
+          git commit -m "GitHub usage update $(date -u +'%d.%m.%Y')"
+          git push
