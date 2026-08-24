@@ -2,27 +2,32 @@
 """
 GitHub Usage Collector
 ----------------------
-Ruft 1x täglich die Verbrauchswerte des VORTAGS für die GitHub-Organisation ab
-und hängt das Ergebnis an data/github_usage.csv an.
+Ruft 1x täglich für JEDES Repo der Organisation die Workflow-Runs des VORTAGS
+ab und summiert die abrechenbare Laufzeit (billable minutes) pro Runner-OS.
+Hängt das Ergebnis an data/github_usage.csv an.
 
-WICHTIG: Die klassischen Billing-Endpoints (/orgs/{org}/settings/billing/actions
-etc.) sind für Orgs auf der neuen "Enhanced Billing Platform" abgeschaltet
-(liefern 404). Stattdessen wird der neue, tagesgenaue Endpoint genutzt:
+WICHTIG: Die Billing-Endpoints (weder die klassischen /orgs/{org}/settings/
+billing/* noch die neuen /organizations/{org}/settings/billing/usage) sind für
+diese Org per API nicht erreichbar - beide liefern 404. Laut GitHub-Doku sind
+Billing-Endpoints nur für Orgs innerhalb eines Enterprise-Accounts bzw. mit
+Zugriff auf die "Enhanced Billing Platform" verfügbar; eine normale Free/Team-
+Org hat dort schlicht keinen API-Zugriff (nur über die Web-UI einsehbar).
 
-  GET /organizations/{org}/settings/billing/usage?year=YYYY&month=M
-
-Dieser liefert pro Tag/Produkt/SKU/Repo eine Zeile (usageItems), inkl.
-tatsächlicher Kosten (netAmount, nach Abzug der im Plan enthaltenen Menge).
-Siehe: https://docs.github.com/en/rest/billing/usage
+Ausweg: Die Run-Timing-API (GET /repos/{owner}/{repo}/actions/runs/{run_id}/
+timing) liefert pro Workflow-Run die exakte abrechenbare Laufzeit pro OS
+(UBUNTU/MACOS/WINDOWS) - ganz ohne Billing-Berechtigung, nur mit normalem
+Lesezugriff auf die Repos. Wir summieren das über alle Runs, die am Vortag
+gestartet wurden.
 
 Benötigte Umgebungsvariablen (als GitHub Secret zu setzen):
-  GH_BILLING_TOKEN -> Fine-grained PAT mit "Administration" (read) auf die Org,
-                      ODER Classic PAT mit admin:org
+  GH_BILLING_TOKEN -> PAT mit "repo" Scope (classic) bzw. Fine-grained-Token
+                      mit "Actions" (read) + "Contents" (read) auf alle Repos
+                      der Org
   GH_ORG           -> Organisation-Slug (z.B. "Munotstadt")
 
 CSV-Spalten (Datumsformat: DD.MM.YYYY):
   Datum;ActionsMinutesLinux;ActionsMinutesMacOS;ActionsMinutesWindows;
-  ActionsMinutesTotal;ActionsNetUSD;StorageGB;StorageNetUSD;CacheBytes
+  ActionsMinutesTotal;RunsGezaehlt;RepoSizeKB;CacheBytes
 """
 
 import csv
@@ -37,11 +42,10 @@ CSV_PATH = os.path.join("data", "github_usage.csv")
 CSV_HEADER = [
     "Datum",
     "ActionsMinutesLinux", "ActionsMinutesMacOS", "ActionsMinutesWindows",
-    "ActionsMinutesTotal", "ActionsNetUSD",
-    "StorageGB", "StorageNetUSD",
-    "CacheBytes",
+    "ActionsMinutesTotal", "RunsGezaehlt", "RepoSizeKB", "CacheBytes",
 ]
 CSV_DELIMITER = ";"
+OS_KEYS = ["UBUNTU", "MACOS", "WINDOWS"]
 
 
 def get_env(name: str) -> str:
@@ -52,7 +56,7 @@ def get_env(name: str) -> str:
     return value.strip()
 
 
-def api_get(path: str, token: str, params: dict | None = None) -> dict:
+def api_get(path: str, token: str, params: dict | None = None) -> dict | None:
     resp = requests.get(
         f"{API_BASE}{path}",
         headers={
@@ -63,10 +67,32 @@ def api_get(path: str, token: str, params: dict | None = None) -> dict:
         params=params,
         timeout=30,
     )
+    if resp.status_code == 404:
+        return None
     if not resp.ok:
         print(f"FEHLER {resp.status_code} bei {path}: {resp.text}", file=sys.stderr)
     resp.raise_for_status()
     return resp.json()
+
+
+def api_get_paginated(path: str, token: str, list_key: str, params: dict | None = None) -> list[dict]:
+    items: list[dict] = []
+    page = 1
+    params = dict(params or {})
+    while True:
+        params["per_page"] = 100
+        params["page"] = page
+        data = api_get(path, token, params=params)
+        if data is None:
+            break
+        batch = data.get(list_key, data if isinstance(data, list) else [])
+        if not batch:
+            break
+        items.extend(batch)
+        if len(batch) < 100:
+            break
+        page += 1
+    return items
 
 
 def load_existing_dates(path: str) -> set[str]:
@@ -80,24 +106,13 @@ def load_existing_dates(path: str) -> set[str]:
     return dates
 
 
-def sku_bucket(sku: str) -> str:
-    s = sku.lower()
-    if "linux" in s or "ubuntu" in s:
-        return "linux"
-    if "macos" in s or "mac" in s:
-        return "macos"
-    if "windows" in s:
-        return "windows"
-    return "other"
-
-
 def main() -> None:
     token = get_env("GH_BILLING_TOKEN")
     org = get_env("GH_ORG")
 
     yesterday = datetime.now(timezone.utc) - timedelta(days=1)
-    target_date_str = yesterday.strftime("%Y-%m-%d")  # Format der API
-    csv_date_str = yesterday.strftime("%d.%m.%Y")      # Munotstadt-Format
+    day_start = yesterday.strftime("%Y-%m-%d")
+    csv_date_str = yesterday.strftime("%d.%m.%Y")
 
     os.makedirs("data", exist_ok=True)
     existing_dates = load_existing_dates(CSV_PATH)
@@ -107,50 +122,72 @@ def main() -> None:
         print(f"Übersprungen (bereits vorhanden): {csv_date_str}")
         return
 
-    data = api_get(
-        f"/organizations/{org}/settings/billing/usage",
-        token,
-        params={"year": yesterday.year, "month": yesterday.month},
-    )
-    items = [i for i in data.get("usageItems", []) if i.get("date") == target_date_str]
+    # Repos direkt paginiert holen (einfache Variante, robuster als obiger Fallback-Versuch)
+    repos: list[dict] = []
+    page = 1
+    while True:
+        batch = requests.get(
+            f"{API_BASE}/orgs/{org}/repos",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params={"type": "all", "per_page": 100, "page": page},
+            timeout=30,
+        )
+        batch.raise_for_status()
+        data = batch.json()
+        if not data:
+            break
+        repos.extend(data)
+        if len(data) < 100:
+            break
+        page += 1
 
-    minutes_by_os = {"linux": 0.0, "macos": 0.0, "windows": 0.0}
-    actions_net = 0.0
-    storage_gb = 0.0
-    storage_net = 0.0
+    if not repos:
+        print("Keine Repos in der Org gefunden.")
+        return
 
-    for item in items:
-        product = (item.get("product") or "").lower()
-        qty = float(item.get("quantity") or 0)
-        net = float(item.get("netAmount") or 0)
+    ms_by_os = {k: 0 for k in OS_KEYS}
+    runs_counted = 0
+    repo_size_kb = sum(r.get("size", 0) or 0 for r in repos)
 
-        if product == "actions":
-            bucket = sku_bucket(item.get("sku", ""))
-            if bucket in minutes_by_os:
-                minutes_by_os[bucket] += qty
-            actions_net += net
-        elif "storage" in product or "packages" in product:
-            storage_gb += qty
-            storage_net += net
+    for repo in repos:
+        owner_repo = repo["full_name"]
+        runs = api_get_paginated(
+            f"/repos/{owner_repo}/actions/runs",
+            token,
+            "workflow_runs",
+            params={"created": day_start},
+        )
+        for run in runs:
+            timing = api_get(f"/repos/{owner_repo}/actions/runs/{run['id']}/timing", token)
+            if not timing:
+                continue
+            billable = timing.get("billable", {})
+            for os_key in OS_KEYS:
+                ms_by_os[os_key] += billable.get(os_key, {}).get("total_ms", 0) or 0
+            runs_counted += 1
+
+    minutes_by_os = {k: v / 60000 for k, v in ms_by_os.items()}
+    total_minutes = sum(minutes_by_os.values())
 
     try:
-        cache = api_get(f"/orgs/{org}/actions/cache/usage", token)
+        cache = api_get(f"/orgs/{org}/actions/cache/usage", token) or {}
         cache_bytes = cache.get("total_active_caches_size_in_bytes", 0)
     except requests.HTTPError:
         print("Hinweis: Cache-Usage-Endpoint nicht verfügbar, setze 0.", file=sys.stderr)
         cache_bytes = 0
 
-    total_minutes = sum(minutes_by_os.values())
-
     row = [
         csv_date_str,
-        round(minutes_by_os["linux"], 2),
-        round(minutes_by_os["macos"], 2),
-        round(minutes_by_os["windows"], 2),
+        round(minutes_by_os["UBUNTU"], 2),
+        round(minutes_by_os["MACOS"], 2),
+        round(minutes_by_os["WINDOWS"], 2),
         round(total_minutes, 2),
-        round(actions_net, 4),
-        round(storage_gb, 4),
-        round(storage_net, 4),
+        runs_counted,
+        repo_size_kb,
         cache_bytes,
     ]
 
@@ -161,9 +198,8 @@ def main() -> None:
         writer.writerow(row)
 
     print(
-        f"OK: {csv_date_str} -> Actions={total_minutes}min (${actions_net:.4f}) "
-        f"Storage={storage_gb}GB (${storage_net:.4f}) Cache={cache_bytes}B "
-        f"[{len(items)} usageItems verarbeitet]"
+        f"OK: {csv_date_str} -> Actions={total_minutes:.2f}min "
+        f"({runs_counted} Runs) RepoSize={repo_size_kb}KB Cache={cache_bytes}B"
     )
 
 
