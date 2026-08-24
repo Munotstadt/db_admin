@@ -23,6 +23,8 @@ Repo → Settings → Secrets and variables → Actions → folgende Repository 
 | `TURSO_ORG_SLUG` | Turso Org-Slug | Turso Dashboard (URL bzw. `GET /v1/organizations`) |
 | `NEON_API_KEY` | Neon API Key | Neon Dashboard → Account/Org Settings → API Keys |
 | `NEON_ORG_ID` | Neon Organisation-ID (falls Account einer Org zugeordnet ist) | Neon Dashboard → Organization Settings |
+| `GH_BILLING_TOKEN` | Fine-grained PAT mit Org-Permission "Administration" (read), Zugriff auf `Munotstadt` | GitHub → Settings → Developer settings → Fine-grained tokens |
+| `GH_ORG` | GitHub Org-Slug (z.B. `Munotstadt`) | — |
 
 ### 2. GitHub Pages aktivieren
 
@@ -36,23 +38,27 @@ Laufen automatisch täglich per Cron, können aber auch manuell unter **Actions*
 |---|---|---|
 | `collect-usage.yml` | 03:00 UTC | Turso-Usage aller Datenbanken abrufen, an `data/turso_usage.csv` anhängen |
 | `collect-neon-usage.yml` | 03:05 UTC | Neon-Usage aller Projekte abrufen, an `data/neon_usage.csv` anhängen |
+| `collect-github-usage.yml` | 03:10 UTC | GitHub Actions-Minuten/Storage/Cache abrufen, an `data/github_usage.csv` anhängen |
 | `run-sql.yml` | manuell | Beliebiges SQL gegen eine Turso-Datenbank ausführen (Inputs: `database`, `sql`) |
 
 ## Dateistruktur
 
 ```
 db_admin/
-├── index.html                          # Dashboard (Turso/Neon-Umschalter)
+├── index.html                          # Dashboard (Turso/Neon/GitHub-Umschalter)
 ├── data/
 │   ├── turso_usage.csv                 # Tägliche Turso-Snapshots
-│   └── neon_usage.csv                  # Tägliche Neon-Snapshots
+│   ├── neon_usage.csv                  # Tägliche Neon-Snapshots
+│   └── github_usage.csv                # Tägliche GitHub-Snapshots
 ├── scripts/
 │   ├── collect_turso_usage.py          # Turso-Collector
 │   ├── collect_neon_usage.py           # Neon-Collector
+│   ├── collect_github_usage.py         # GitHub-Collector (Actions/Storage/Cache)
 │   └── run_sql.py                      # Ad-hoc-SQL-Runner (Turso)
 └── .github/workflows/
     ├── collect-usage.yml
     ├── collect-neon-usage.yml
+    ├── collect-github-usage.yml
     └── run-sql.yml
 ```
 
@@ -65,6 +71,11 @@ Werte sind Tagesdeltas (ausser `StorageBytes`, ein Snapshot).
 
 **`neon_usage.csv`**: `Datum;Projekt;ComputeTimeSeconds;ActiveTimeSeconds;WrittenDataBytes;DataTransferBytes;StorageBytes`
 Werte sind kumuliert seit Beginn der aktuellen Neon-Abrechnungsperiode (von Neon selbst automatisch zurückgesetzt, kein manuelles Reset-Handling nötig).
+
+**`github_usage.csv`**: `Datum;ActionsMinutesLinux;ActionsMinutesMacOS;ActionsMinutesWindows;ActionsMinutesTotal;ActionsNetUSD;StorageGB;StorageNetUSD;CacheBytes`
+Werte sind Tagesdeltas für den VORTAG (analog Turso), inkl. tatsächlicher Kosten (`*NetUSD`, nach Abzug der im Plan enthaltenen Freimenge). `CacheBytes` ist ein Snapshot (aktueller Actions-Cache-Verbrauch).
+
+⚠️ Nutzt bewusst NICHT die klassischen Org-Billing-Endpoints (`/orgs/{org}/settings/billing/actions` etc.) – diese liefern für Orgs auf der neuen **Enhanced Billing Platform** einen 404. Stattdessen wird `/organizations/{org}/settings/billing/usage` verwendet, der tagesgenaue `usageItems` (Produkt/SKU/Menge/Kosten) liefert. Details: [docs.github.com/rest/billing/usage](https://docs.github.com/en/rest/billing/usage).
 
 ## Dashboard-Logik
 

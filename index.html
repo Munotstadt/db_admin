@@ -825,22 +825,23 @@ function loadNeonData() {
 }
 
 // ---------- GitHub ----------
+// Werte sind Tagesdeltas (Vortag), analog Turso. Kosten stammen direkt aus der
+// Enhanced-Billing-API (netAmount = tatsächlich verrechneter Betrag nach Abzug
+// der im Plan enthaltenen Freimenge). Kein fixes "Limit" mehr darstellbar, da
+// GitHub das nicht mehr als einfache Obergrenze ausgibt, sondern nur noch Kosten.
 
-// Actions-Minuten-Limit gilt nur für private Repos auf zahlungspflichtigen Runnern;
-// bei public Repos/Free-Runnern unbegrenzt. Hier als Referenzwert für Free-Plan Team/Org.
-const GITHUB_LIMITS = {
-  IncludedMinutesFallback: 3000, // wird von der API überschrieben, falls vorhanden
-  StorageGB: 2, // Free-Plan Shared-Storage-Richtwert
-};
+function fmtUSD(n) {
+  return Number(n).toLocaleString('de-CH', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 });
+}
 
 function buildGithubCard(rows) {
   const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
   const latest = sorted[sorted.length - 1];
 
-  const totalMinutes = Number(latest.TotalMinutesUsed) || 0;
-  const includedMinutes = Number(latest.IncludedMinutes) || GITHUB_LIMITS.IncludedMinutesFallback;
-  const paidMinutes = Number(latest.PaidMinutesUsed) || 0;
-  const storageGB = Number(latest.StorageEstimateGB) || 0;
+  const totalMinutes = Number(latest.ActionsMinutesTotal) || 0;
+  const actionsNet = Number(latest.ActionsNetUSD) || 0;
+  const storageGB = Number(latest.StorageGB) || 0;
+  const storageNet = Number(latest.StorageNetUSD) || 0;
   const cacheBytes = Number(latest.CacheBytes) || 0;
 
   const card = document.createElement('div');
@@ -852,35 +853,33 @@ function buildGithubCard(rows) {
     </div>
     <div class="metrics five">
       <div class="metric">
-        <div class="metric-label">Actions Minuten (Periode)</div>
-        <div class="metric-value accent">${fmtInt(totalMinutes)} min</div>
-        <div class="metric-sub">${fmtPct(totalMinutes, includedMinutes)} von ${fmtInt(includedMinutes)} min</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(totalMinutes, includedMinutes)}%"></div></div>
+        <div class="metric-label">Actions Minuten (Tag)</div>
+        <div class="metric-value accent">${totalMinutes.toLocaleString('de-CH', { maximumFractionDigits: 1 })} min</div>
+        <div class="metric-sub">${fmtUSD(actionsNet)}</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Davon kostenpflichtig</div>
-        <div class="metric-value">${fmtInt(paidMinutes)} min</div>
+        <div class="metric-label">Linux / macOS / Windows</div>
+        <div class="metric-value" style="font-size:13px;">${Number(latest.ActionsMinutesLinux).toLocaleString('de-CH', { maximumFractionDigits: 1 })} / ${Number(latest.ActionsMinutesMacOS).toLocaleString('de-CH', { maximumFractionDigits: 1 })} / ${Number(latest.ActionsMinutesWindows).toLocaleString('de-CH', { maximumFractionDigits: 1 })}</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Ubuntu / macOS / Windows</div>
-        <div class="metric-value" style="font-size:13px;">${fmtInt(latest.MinutesUbuntu)} / ${fmtInt(latest.MinutesMacOS)} / ${fmtInt(latest.MinutesWindows)}</div>
+        <div class="metric-label">Storage/Packages (Tag)</div>
+        <div class="metric-value">${storageGB.toLocaleString('de-CH', { maximumFractionDigits: 3 })} GB</div>
+        <div class="metric-sub">${fmtUSD(storageNet)}</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Shared Storage (Schätzung)</div>
-        <div class="metric-value">${storageGB.toLocaleString('de-CH', { maximumFractionDigits: 2 })} GB</div>
-        <div class="metric-sub">${fmtPct(storageGB, GITHUB_LIMITS.StorageGB)} von ${GITHUB_LIMITS.StorageGB} GB</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(storageGB, GITHUB_LIMITS.StorageGB)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Actions Cache</div>
+        <div class="metric-label">Actions Cache (aktuell)</div>
         <div class="metric-value">${fmtBytes(cacheBytes)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Kosten gesamt (Tag)</div>
+        <div class="metric-value">${fmtUSD(actionsNet + storageNet)}</div>
       </div>
     </div>
   `;
 
   if (sorted.length >= 2) {
     const charts = [
-      { key: 'TotalMinutesUsed', formatter: fmtInt, title: 'Actions Minuten — Verlauf (kumuliert seit Periodenbeginn)' },
+      { key: 'ActionsMinutesTotal', formatter: (v) => `${Number(v).toLocaleString('de-CH')} min`, title: 'Actions Minuten — Verlauf (pro Tag)' },
       { key: 'CacheBytes', formatter: fmtBytes, title: 'Actions Cache — Verlauf' },
     ];
     charts.forEach((c, cIdx) => {
