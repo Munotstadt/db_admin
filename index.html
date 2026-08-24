@@ -825,23 +825,19 @@ function loadNeonData() {
 }
 
 // ---------- GitHub ----------
-// Werte sind Tagesdeltas (Vortag), analog Turso. Kosten stammen direkt aus der
-// Enhanced-Billing-API (netAmount = tatsächlich verrechneter Betrag nach Abzug
-// der im Plan enthaltenen Freimenge). Kein fixes "Limit" mehr darstellbar, da
-// GitHub das nicht mehr als einfache Obergrenze ausgibt, sondern nur noch Kosten.
-
-function fmtUSD(n) {
-  return Number(n).toLocaleString('de-CH', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 });
-}
+// Werte sind Tagesdeltas (Vortag), analog Turso. Basiert auf der Run-Timing-API
+// (/repos/{owner}/{repo}/actions/runs/{run_id}/timing) statt der Billing-API,
+// da diese Org keinen API-Zugriff auf Billing-Daten hat (nur Enterprise-Orgs).
+// Daher keine Kosten/Limits darstellbar, nur die tatsächlichen Minuten pro OS,
+// Anzahl gezählter Runs und die Git-Repo-Grösse als Storage-Näherung.
 
 function buildGithubCard(rows) {
   const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
   const latest = sorted[sorted.length - 1];
 
   const totalMinutes = Number(latest.ActionsMinutesTotal) || 0;
-  const actionsNet = Number(latest.ActionsNetUSD) || 0;
-  const storageGB = Number(latest.StorageGB) || 0;
-  const storageNet = Number(latest.StorageNetUSD) || 0;
+  const runsCounted = Number(latest.RunsGezaehlt) || 0;
+  const repoSizeKB = Number(latest.RepoSizeKB) || 0;
   const cacheBytes = Number(latest.CacheBytes) || 0;
 
   const card = document.createElement('div');
@@ -855,24 +851,20 @@ function buildGithubCard(rows) {
       <div class="metric">
         <div class="metric-label">Actions Minuten (Tag)</div>
         <div class="metric-value accent">${totalMinutes.toLocaleString('de-CH', { maximumFractionDigits: 1 })} min</div>
-        <div class="metric-sub">${fmtUSD(actionsNet)}</div>
+        <div class="metric-sub">${runsCounted} Run(s)</div>
       </div>
       <div class="metric">
         <div class="metric-label">Linux / macOS / Windows</div>
         <div class="metric-value" style="font-size:13px;">${Number(latest.ActionsMinutesLinux).toLocaleString('de-CH', { maximumFractionDigits: 1 })} / ${Number(latest.ActionsMinutesMacOS).toLocaleString('de-CH', { maximumFractionDigits: 1 })} / ${Number(latest.ActionsMinutesWindows).toLocaleString('de-CH', { maximumFractionDigits: 1 })}</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Storage/Packages (Tag)</div>
-        <div class="metric-value">${storageGB.toLocaleString('de-CH', { maximumFractionDigits: 3 })} GB</div>
-        <div class="metric-sub">${fmtUSD(storageNet)}</div>
+        <div class="metric-label">Repo-Grösse (Git, gesamt)</div>
+        <div class="metric-value">${fmtBytes(repoSizeKB * 1024)}</div>
+        <div class="metric-sub">Näherung, nicht identisch mit Actions-Storage</div>
       </div>
       <div class="metric">
         <div class="metric-label">Actions Cache (aktuell)</div>
         <div class="metric-value">${fmtBytes(cacheBytes)}</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Kosten gesamt (Tag)</div>
-        <div class="metric-value">${fmtUSD(actionsNet + storageNet)}</div>
       </div>
     </div>
   `;
