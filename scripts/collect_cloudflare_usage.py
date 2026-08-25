@@ -13,9 +13,13 @@ gelten bzw. sich am saubersten so vergleichen lassen. Storage-Werte (KV, D1,
 R2) sind Snapshots (aktueller Stand am Ende des Vortags).
 
 Benötigte Umgebungsvariablen (als GitHub Secret zu setzen):
-  CF_API_TOKEN   -> Cloudflare API Token mit Berechtigung
-                     "Account Analytics: Read" (+ "Zone Analytics: Read"
-                     falls CF_ZONE_ID gesetzt wird)
+  CF_API_TOKEN   -> Cloudflare API Token mit Berechtigungen:
+                     - Account: Account Analytics: Read
+                     - Account: D1: Read (für die D1-Datenbankgrössen, da
+                       diese nicht über die GraphQL Analytics API verfügbar
+                       sind, siehe fetch_d1())
+                     - Zone: Zone Analytics: Read, gescoped auf die
+                       jeweilige Zone (nur falls CF_ZONE_ID gesetzt wird)
                      Erstellen unter: dash.cloudflare.com -> My Profile ->
                      API Tokens -> Create Token
   CF_ACCOUNT_ID  -> Cloudflare Account-ID (Dashboard -> rechte Seitenleiste
@@ -158,6 +162,7 @@ def fetch_kv(token: str, account_id: str, day: str) -> tuple[int, int, int]:
             filter: { date: $date }
             orderBy: [date_DESC]
           ) {
+            dimensions { date }
             max { byteCount }
           }
         }
@@ -180,7 +185,6 @@ def fetch_d1(token: str, account_id: str, day: str) -> tuple[int, int, int, int,
             filter: { date: $date }
           ) {
             sum { readQueries writeQueries rowsRead rowsWritten }
-            max { databaseSizeBytes }
           }
         }
       }
@@ -192,7 +196,21 @@ def fetch_d1(token: str, account_id: str, day: str) -> tuple[int, int, int, int,
     write_q = sum(g["sum"]["writeQueries"] for g in groups)
     rows_read = sum(g["sum"]["rowsRead"] for g in groups)
     rows_written = sum(g["sum"]["rowsWritten"] for g in groups)
-    storage = sum(g["max"]["databaseSizeBytes"] for g in groups) if groups else 0
+
+    # D1-Storage ist kein Feld in d1AnalyticsAdaptiveGroups (führte zu "unknown
+    # field 'max'"). Stattdessen über die reguläre REST-API abrufen, die pro
+    # Datenbank eine Dateigrösse liefert.
+    storage = 0
+    resp = requests.get(
+        f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database",
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    databases = resp.json().get("result", []) or []
+    for db in databases:
+        storage += db.get("file_size") or db.get("size") or 0
+
     return read_q, write_q, rows_read, rows_written, storage
 
 
@@ -226,6 +244,7 @@ def fetch_r2(token: str, account_id: str, day: str) -> tuple[int, int, int]:
             filter: { date: $date }
             orderBy: [date_DESC]
           ) {
+            dimensions { date }
             max { payloadSize }
           }
         }
