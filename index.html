@@ -127,6 +127,7 @@
   .dot-hit{fill:transparent;}
   .axis-label{font-family:'IBM Plex Mono',monospace; font-size:9px; fill:var(--ink-soft);}
   .grid-line{stroke:var(--line); stroke-width:1;}
+  .threshold-line{stroke:var(--ink-soft); stroke-width:1;}
 
   #tooltip{
     position:fixed; background:var(--ink); color:#fff; border:1px solid var(--red);
@@ -347,12 +348,13 @@ function computeMonthlyCumulative(rows, key) {
   });
 }
 
-function buildComboChart(rows, key, formatter, id) {
+function buildComboChart(rows, key, formatter, id, opts) {
+  opts = opts || {};
   const w = 600, h = 110, padL = 4, padR = 4, padT = 10, padB = 18;
   const dailyValues = rows.map(r => Number(r[key]) || 0);
   const cumulativeValues = computeMonthlyCumulative(rows, key);
 
-  const maxDaily = Math.max(...dailyValues, 1);
+  const maxDaily = Math.max(...dailyValues, opts.thresholdDaily || 0, 1);
   const maxCumulative = Math.max(...cumulativeValues, 1);
   const innerH = h - padT - padB;
   const n = rows.length;
@@ -380,6 +382,12 @@ function buildComboChart(rows, key, formatter, id) {
     dots += `<circle class="dot-hit" data-idx="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="12"></circle>`;
   });
 
+  let thresholdLine = '';
+  if (opts.thresholdDaily) {
+    const ty = padT + (1 - opts.thresholdDaily / maxDaily) * innerH;
+    thresholdLine = `<line class="threshold-line" x1="${padL}" y1="${ty.toFixed(1)}" x2="${w - padR}" y2="${ty.toFixed(1)}" stroke-dasharray="4 3"></line>`;
+  }
+
   const firstLabel = rows[0] ? rows[0]['Datum'] : '';
   const lastLabel = rows[rows.length - 1] ? rows[rows.length - 1]['Datum'] : '';
 
@@ -387,6 +395,7 @@ function buildComboChart(rows, key, formatter, id) {
     <svg viewBox="0 0 ${w} ${h}" id="${id}" data-key="${key}">
       <line class="grid-line" x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}"></line>
       ${bars}
+      ${thresholdLine}
       <path class="line" d="${pathD}"></path>
       ${dots}
       <text class="axis-label" x="${padL}" y="${h - 4}">${firstLabel}</text>
@@ -394,6 +403,54 @@ function buildComboChart(rows, key, formatter, id) {
     </svg>`;
 
   return { svg, points: linePoints, formatter };
+}
+
+function buildDiffBarChart(rows, key, formatter, id, opts) {
+  opts = opts || {};
+  const w = 600, h = 110, padL = 4, padR = 4, padT = 10, padB = 18;
+  const rawValues = rows.map(r => Number(r[key]) || 0);
+  const dailyValues = rawValues.map((v, i) => i === 0 ? v : Math.max(v - rawValues[i - 1], 0));
+
+  const maxDaily = Math.max(...dailyValues, opts.threshold || 0, 1);
+  const innerH = h - padT - padB;
+  const n = rows.length;
+  const slot = (w - padL - padR) / n;
+  const barW = Math.max(slot * 0.5, 2);
+
+  let bars = '';
+  const points = dailyValues.map((v, i) => {
+    const barH = (v / maxDaily) * innerH;
+    const x = padL + i * slot + (slot - barW) / 2;
+    const y = padT + innerH - barH;
+    bars += `<rect class="bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(barH, 0.5).toFixed(1)}"></rect>`;
+    return { x: x + barW / 2, y, v, datum: rows[i]['Datum'] };
+  });
+
+  let dots = '';
+  points.forEach((p, i) => {
+    dots += `<circle class="dot-hit" data-idx="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="12"></circle>`;
+  });
+
+  let thresholdLine = '';
+  if (opts.threshold) {
+    const ty = padT + (1 - opts.threshold / maxDaily) * innerH;
+    thresholdLine = `<line class="threshold-line" x1="${padL}" y1="${ty.toFixed(1)}" x2="${w - padR}" y2="${ty.toFixed(1)}" stroke-dasharray="4 3"></line>`;
+  }
+
+  const firstLabel = rows[0] ? rows[0]['Datum'] : '';
+  const lastLabel = rows[rows.length - 1] ? rows[rows.length - 1]['Datum'] : '';
+
+  const svg = `
+    <svg viewBox="0 0 ${w} ${h}" id="${id}" data-key="${key}">
+      <line class="grid-line" x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}"></line>
+      ${bars}
+      ${thresholdLine}
+      ${dots}
+      <text class="axis-label" x="${padL}" y="${h - 4}">${firstLabel}</text>
+      <text class="axis-label" x="${w - padR}" y="${h - 4}" text-anchor="end">${lastLabel}</text>
+    </svg>`;
+
+  return { svg, points, formatter };
 }
 
 function buildSparkline(rows, key, formatter, id) {
@@ -442,7 +499,7 @@ function attachTooltip(containerId, points, formatter, label, showDaily) {
       tooltip.style.display = 'block';
       tooltip.style.left = (clientX + 12) + 'px';
       tooltip.style.top = (clientY - 30) + 'px';
-      if (showDaily) {
+      if (showDaily === 'combo') {
         tooltip.innerHTML = `${p.datum}<br>Tag: <b>${formatter(p.daily)}</b><br>Monat (kum.): <b>${formatter(p.cumulative)}</b>`;
       } else {
         tooltip.innerHTML = `${p.datum}<br>${label}: <b>${formatter(p.v)}</b>`;
@@ -465,14 +522,16 @@ function renderChartBlocks(card, rows, idPrefix, charts) {
     if (rows.length < 2) return;
     const chartId = `${idPrefix}-${cIdx}`;
     const built = c.combo
-      ? buildComboChart(rows, c.key, c.formatter, chartId)
-      : buildSparkline(rows, c.key, c.formatter, chartId);
+      ? buildComboChart(rows, c.key, c.formatter, chartId, { thresholdDaily: c.thresholdDaily })
+      : c.diffBar
+        ? buildDiffBarChart(rows, c.key, c.formatter, chartId, { threshold: c.threshold })
+        : buildSparkline(rows, c.key, c.formatter, chartId);
     const { svg, points, formatter } = built;
     const block = document.createElement('div');
     block.className = 'chart-block';
     block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
     card.appendChild(block);
-    setTimeout(() => attachTooltip(chartId, points, formatter, c.label || c.title, !!c.combo), 0);
+    setTimeout(() => attachTooltip(chartId, points, formatter, c.label || c.title, c.combo ? 'combo' : (c.diffBar ? 'diffBar' : false)), 0);
   });
 }
 
@@ -569,7 +628,7 @@ function renderSummary(rowsByDb) {
   card.className = 'chart-card';
   card.innerHTML = `<div class="card-header"><div class="card-title">Verlauf — alle Datenbanken</div><div class="card-updated">Stand: ${aggRows[aggRows.length - 1].Datum}</div></div>`;
   renderChartBlocks(card, aggRows, 'summary-chart', [
-    { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
+    { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.) · gepunktet: 16 Mio./Tag', combo: true, thresholdDaily: 16000000 },
     { key: 'RowsWritten', label: 'Rows Written', formatter: fmtInt, title: 'Rows Written — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
     { key: 'StorageBytes', label: 'Storage', formatter: fmtBytes, title: 'Storage-Verlauf', combo: false },
   ]);
@@ -650,7 +709,7 @@ function buildNeonDbCard(name, rows, idPrefix) {
     </div>
   `;
   renderChartBlocks(card, sorted, idPrefix, [
-    { key: 'ComputeTimeSeconds', formatter: fmtHours, title: 'Compute Time — Verlauf (kumuliert seit Periodenbeginn, Reset durch Neon)' },
+    { key: 'ComputeTimeSeconds', label: 'Compute Time', formatter: fmtHours, title: 'Compute Time — Säule: Tag (Δ zum Vortag) · gepunktet: 3.22 h/Tag', diffBar: true, threshold: 3.22 * 3600 },
     { key: 'WrittenDataBytes', formatter: fmtBytes, title: 'Written Data — Verlauf' },
     { key: 'StorageBytes', formatter: fmtBytes, title: 'Storage — Verlauf' },
   ]);
