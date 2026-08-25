@@ -1,279 +1,255 @@
 <!DOCTYPE html>
-<html lang="de-CH">
+<html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DB Admin</title>
+<title>DB Admin — Munotstadt</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --red: #E30613;
-    --bg: #f7f7f5;
-    --card: #ffffff;
-    --border: #e2e2e0;
-    --text: #1a1a1a;
-    --muted: #6b6b6b;
+  :root{
+    --red:#E30613;
+    --red-dim:#f4c9cc;
+    --ink:#14181c;
+    --ink-soft:#4b5560;
+    --paper:#ffffff;
+    --paper-alt:#ffffff;
+    --hover:#f7f7f8;
+    --line:#dde1e4;
+    --line-soft:#eceef0;
+    --green:#0d7a3f;
+    --green-bg:#e7f4ec;
+    --red-bg:#fdeceb;
+    --radius:4px;
   }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    padding: 20px 16px 60px;
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:#ffffff;
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
   }
-  h1 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700;
-    font-size: 22px;
-    margin: 0 0 4px;
+  h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;margin:0;font-weight:600;letter-spacing:-0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+
+  /* ---------- Top bar ---------- */
+  header.topbar{
+    background:#fff;
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:18px 20px 14px;
+    position:sticky; top:0; z-index:50;
+    border-bottom:2px solid var(--red);
   }
-  h2 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700;
-    font-size: 15px;
-    margin: 28px 0 10px;
-    color: var(--text);
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand h1{font-size:20px; letter-spacing:0.02em; color:var(--ink); text-transform:uppercase; font-weight:700;}
+  .brand .sub{font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); letter-spacing:0.08em; text-transform:uppercase; margin-top:2px;}
+
+  nav.tabs{
+    display:flex; gap:4px; overflow-x:auto; flex-wrap:wrap;
+    background:#fff;
+    padding:10px 20px;
+    border-bottom:1px solid var(--line);
   }
-  .subtitle {
-    color: var(--muted);
-    font-size: 13px;
-    margin-bottom: 20px;
-    font-family: 'IBM Plex Mono', monospace;
+  nav.tabs button{
+    background:none; color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:500;
+    padding:6px 10px; cursor:pointer; white-space:nowrap;
+    border:1px solid transparent; border-radius:3px;
+    transition:color .15s, border-color .15s, background .15s;
   }
-  .db-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  nav.tabs button:hover{color:var(--ink); border-color:var(--line);}
+  nav.tabs button.active{color:var(--ink); font-weight:600; border-color:var(--red); background:rgba(227,6,19,0.06);}
+
+  main{max-width:1240px; margin:0 auto; padding:22px 20px 60px;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ---------- Cards / grid ---------- */
+  .grid{display:grid; gap:14px;}
+  .grid.cols-5{grid-template-columns:repeat(5,1fr);}
+  .grid.cols-4{grid-template-columns:repeat(4,1fr);}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr);}
+  .grid.cols-2{grid-template-columns:repeat(2,1fr);}
+  @media(max-width:1000px){.grid.cols-5{grid-template-columns:repeat(3,1fr);}}
+  @media(max-width:900px){.grid.cols-4{grid-template-columns:repeat(2,1fr);} .grid.cols-3{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:600px){.grid.cols-5,.grid.cols-4,.grid.cols-3,.grid.cols-2{grid-template-columns:1fr;}}
+
+  .card{
+    background:transparent;
+    border:none;
+    border-radius:0;
+    padding:0;
   }
-  .db-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 10px;
+  .card.kpi{border-bottom:1px solid var(--line); padding-bottom:14px;}
+  .card.kpi .label{font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-soft); margin-bottom:8px; font-family:'IBM Plex Mono',monospace;}
+  .card.kpi .value{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600;}
+  .card.kpi .delta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; margin-top:6px; color:var(--ink-soft);}
+  .delta.pos{color:var(--green);}
+  .delta.neg{color:var(--red);}
+
+  .progress{margin-top:7px; height:4px; border-radius:2px; background:var(--line-soft); overflow:hidden;}
+  .progress-fill{height:100%; background:var(--red); border-radius:2px;}
+
+  .section-title{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin:28px 0 12px; flex-wrap:wrap; gap:6px;
   }
-  .db-name {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700;
-    font-size: 16px;
+  .section-title h2{font-size:18px;}
+  .section-title .hint{font-size:12px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
+  .section-title:first-child{margin-top:0;}
+
+  /* ---------- Detail card (chart container) ---------- */
+  .chart-card{
+    border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px 18px 10px; background:var(--paper);
   }
-  .db-updated {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
+  .chart-card .card-header{
+    display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px;
+    margin-bottom:12px;
   }
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    margin-bottom: 14px;
+  .chart-card .card-title{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;}
+  .chart-card .card-updated{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft);}
+
+  .chart-block{margin-top:14px; padding-top:14px; border-top:1px solid var(--line-soft);}
+  .chart-block:first-of-type{border-top:none; margin-top:6px; padding-top:0;}
+  .chart-title{font-size:11px; color:var(--ink-soft); margin-bottom:6px; font-family:'IBM Plex Mono',monospace;}
+  svg{display:block; width:100%; height:auto; touch-action:pan-y;}
+  .line{fill:none; stroke:var(--red); stroke-width:2;}
+  .bar{fill:#d7dade;}
+  .dot{fill:var(--red);}
+  .dot-hit{fill:transparent;}
+  .axis-label{font-family:'IBM Plex Mono',monospace; font-size:9px; fill:var(--ink-soft);}
+  .grid-line{stroke:var(--line); stroke-width:1;}
+
+  #tooltip{
+    position:fixed; background:var(--ink); color:#fff; border:1px solid var(--red);
+    border-radius:var(--radius); padding:6px 10px; font-family:'IBM Plex Mono',monospace;
+    font-size:11px; pointer-events:none; display:none; z-index:100; white-space:nowrap;
   }
-  .metrics.five {
-    grid-template-columns: repeat(2, 1fr);
+
+  .empty-state{
+    text-align:center; padding:50px 20px; color:var(--ink-soft);
+    border:1px dashed var(--line); border-radius:var(--radius); background:var(--paper);
+    font-family:'IBM Plex Mono',monospace; font-size:13px;
   }
-  @media (min-width: 480px) {
-    .metrics.five { grid-template-columns: repeat(3, 1fr); }
+
+  /* ---------- Controls ---------- */
+  button.btn{
+    font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:13px;
+    background:var(--ink); color:#fff; border:none; border-radius:var(--radius);
+    padding:8px 14px; cursor:pointer;
   }
-  .metric {
-    background: #fafaf8;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 10px;
+  button.btn:hover{background:#000;}
+  button.btn.ghost{background:none; color:var(--ink); border:1px solid var(--line);}
+  button.btn.ghost:hover{border-color:var(--ink);}
+
+  select{
+    font-family:'IBM Plex Mono',monospace; font-size:13px;
+    border:1px solid var(--line); border-radius:var(--radius);
+    padding:8px 10px; background:#fff; color:var(--ink);
+    width:100%; max-width:360px; margin-bottom:14px;
+    -webkit-appearance:none; appearance:none;
   }
-  .metric-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted);
-    margin-bottom: 2px;
+  select:focus{outline:2px solid var(--red); outline-offset:-1px;}
+
+  footer.foot{
+    text-align:center; padding:24px; color:var(--ink-soft); font-size:11.5px; font-family:'IBM Plex Mono',monospace;
   }
-  .metric-value {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 15px;
-    font-weight: 500;
-  }
-  .metric-value.accent { color: var(--red); }
-  .metric-sub {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-    margin-top: 3px;
-  }
-  .progress {
-    margin-top: 5px;
-    height: 4px;
-    border-radius: 2px;
-    background: #ececea;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    background: var(--red);
-    border-radius: 2px;
-  }
-  .chart-block { margin-top: 10px; }
-  .chart-title {
-    font-size: 11px;
-    color: var(--muted);
-    margin-bottom: 4px;
-    font-family: 'IBM Plex Mono', monospace;
-  }
-  svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
-  .line { fill: none; stroke: var(--red); stroke-width: 2; }
-  .bar { fill: #c9c9c6; }
-  .dot { fill: var(--red); }
-  .dot-hit { fill: transparent; }
-  .axis-label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 9px;
-    fill: var(--muted);
-  }
-  .grid-line { stroke: var(--border); stroke-width: 1; }
-  #tooltip {
-    position: fixed;
-    background: #1a1a1a;
-    color: #fff;
-    border: 1px solid var(--red);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    pointer-events: none;
-    display: none;
-    z-index: 10;
-    white-space: nowrap;
-  }
-  .empty-state {
-    color: var(--muted);
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 13px;
-    padding: 40px 0;
-    text-align: center;
-  }
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
-    padding: 14px 0 18px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 18px;
-  }
-  .brand {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700;
-    font-size: 18px;
-    color: var(--text);
-  }
-  .brand span { color: var(--red); }
-  .tabs {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-  .tabs a, .tabs button {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    color: var(--muted);
-    text-decoration: none;
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid transparent;
-    background: none;
-    cursor: pointer;
-  }
-  .tabs a.active, .tabs button.active {
-    color: var(--red);
-    border-color: var(--border);
-    background: #fff;
-  }
-  .tabs button { font-family: 'IBM Plex Mono', monospace; }
-  main { max-width: 900px; margin: 0 auto; }
-  .secondary {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    color: var(--text);
-    background: #ffffff;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 14px;
-    cursor: pointer;
-  }
-  .secondary:active { background: #f0f0ee; }
-  select {
-    width: 100%;
-    background: #ffffff;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 14px;
-    margin-bottom: 14px;
-    -webkit-appearance: none;
-    appearance: none;
-  }
+  ::-webkit-scrollbar{height:8px; width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
 </style>
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand">DB <span>Admin</span></div>
-  <nav class="tabs">
-    <button id="tabTurso" class="active" data-hosting="turso">Turso</button>
-    <button id="tabNeon" data-hosting="neon">Neon</button>
-    <button id="tabGithub" data-hosting="github">GitHub</button>
-    <button id="refreshBtn" class="secondary">Aktualisieren</button>
-  </nav>
+  <div class="brand">
+    <div>
+      <h1>DB Admin</h1>
+      <div class="sub">Munotstadt · Resource Monitoring</div>
+    </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <div class="sub mono" id="header-status" style="text-align:right; color:var(--ink-soft); font-size:11px;">lädt …</div>
+    <button id="refreshBtn" class="btn ghost">Aktualisieren</button>
+  </div>
 </header>
 
+<nav class="tabs">
+  <button data-view="turso" class="active">Turso</button>
+  <button data-view="neon">Neon</button>
+  <button data-view="cloudflare">Cloudflare</button>
+</nav>
+
 <main>
-<div class="subtitle" id="subtitle">lädt …</div>
 
-<div id="tursoView">
-<h2>Forecast (Hochrechnung Monat)</h2>
-<div id="forecast"></div>
+  <!-- ============ TURSO ============ -->
+  <section id="view-turso" class="view active">
+    <div class="section-title">
+      <h2>Hochrechnung (Monat)</h2>
+      <span class="hint">Ø letzte 30 Tage × 30.5, gegen Free-Plan-Limits</span>
+    </div>
+    <div class="grid cols-2" id="forecast"></div>
 
-<h2>Gesamt (alle Datenbanken)</h2>
-<div id="summary"></div>
+    <div class="section-title">
+      <h2>Gesamt (alle Datenbanken)</h2>
+      <span class="hint">Kumuliert seit Monatsbeginn</span>
+    </div>
+    <div class="grid cols-5" id="summary"></div>
+    <div id="summaryCharts"></div>
 
-<h2>Datenbank Details</h2>
-<select id="dbSelect"></select>
-<div id="dbDetail"></div>
-</div>
+    <div class="section-title">
+      <h2>Datenbank Details</h2>
+    </div>
+    <select id="dbSelect"></select>
+    <div id="dbDetail"></div>
+  </section>
 
-<div id="neonView" style="display:none;">
-<h2>Gesamt (alle Projekte)</h2>
-<div id="neonSummary"></div>
+  <!-- ============ NEON ============ -->
+  <section id="view-neon" class="view">
+    <div class="section-title">
+      <h2>Gesamt (alle Projekte)</h2>
+      <span class="hint">Kumuliert seit Beginn der Abrechnungsperiode</span>
+    </div>
+    <div class="grid cols-5" id="neonSummary"></div>
 
-<h2>Projekt Details</h2>
-<select id="neonProjectSelect"></select>
-<div id="neonProjectDetail"></div>
-</div>
+    <div class="section-title">
+      <h2>Projekt Details</h2>
+    </div>
+    <select id="neonProjectSelect"></select>
+    <div id="neonProjectDetail"></div>
+  </section>
 
-<div id="githubView" style="display:none;">
-<h2>Organisation</h2>
-<div id="githubSummary"></div>
-</div>
+  <!-- ============ CLOUDFLARE ============ -->
+  <section id="view-cloudflare" class="view">
+    <div class="section-title">
+      <h2>Account-weit</h2>
+      <span class="hint">Requests/Ops: Tagesdelta Vortag · Storage: Snapshot</span>
+    </div>
+    <div class="grid cols-5" id="cloudflareSummary"></div>
+    <div id="cloudflareCharts"></div>
+  </section>
+
 </main>
+
+<footer class="foot">db_admin · Munotstadt</footer>
 
 <div id="tooltip"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script>
-const CSV_URL = "data/turso_usage.csv"; // ggf. relativen Pfad anpassen
+const CSV_URL = "data/turso_usage.csv";
 const NEON_CSV_URL = "data/neon_usage.csv";
-const GITHUB_CSV_URL = "data/github_usage.csv";
+const CLOUDFLARE_CSV_URL = "data/cloudflare_usage.csv";
 const tooltip = document.getElementById("tooltip");
 
-// Monatslimits (Turso Free/Plan-Grenzen) - anpassen falls sich der Plan ändert
+// Turso Free-Plan-Limits (Monatsgrenzen) - anpassen falls sich der Plan ändert
 const LIMITS = {
   RowsRead: 500000000,
   RowsWritten: 10000000,
@@ -281,6 +257,31 @@ const LIMITS = {
   StorageBytes: 5 * 1024 ** 3,  // 5 GB
   Databases: 50,
 };
+
+// Neon Free-Plan-Limits (pro Projekt, ausser Projekte-Limit das account-weit gilt)
+const NEON_LIMITS = {
+  StorageBytesPerProject: 0.5 * 1024 ** 3,   // 512 MB
+  ComputeHoursPerProject: 100,               // CU-Stunden/Monat
+  TransferBytesPerProject: 5 * 1024 ** 3,    // 5 GB
+  MaxProjects: 100,
+  MaxBranchesPerProject: 10,                 // aktuell nicht erfasst, siehe README
+};
+
+// Cloudflare Free-Plan-Limits (account-weit, Stand siehe README)
+const CF_LIMITS = {
+  WorkersRequestsPerDay: 100000,
+  KVReadsPerDay: 100000,
+  KVWritesPerDay: 1000,
+  KVStorageBytes: 1 * 1024 ** 3,       // 1 GB
+  D1RowsReadPerDay: 5000000,
+  D1RowsWrittenPerDay: 100000,
+  D1StorageBytes: 5 * 1024 ** 3,       // 5 GB
+  R2StorageBytes: 10 * 1024 ** 3,      // 10 GB
+  R2ClassAOpsPerMonth: 1000000,
+  R2ClassBOpsPerMonth: 10000000,
+};
+
+// ---------- Formatierung ----------
 
 function fmtBytes(n) {
   n = Number(n);
@@ -303,11 +304,33 @@ function pctWidth(value, limit) {
   return Math.min(100, (value / limit) * 100).toFixed(1);
 }
 
+function fmtHours(seconds) {
+  const h = Number(seconds) / 3600;
+  return `${h.toLocaleString('de-CH', { maximumFractionDigits: 1 })} h`;
+}
+
 function parseDatum(d) {
   // DD.MM.YYYY -> Date
   const [dd, mm, yyyy] = d.split('.').map(Number);
   return new Date(Date.UTC(yyyy, mm - 1, dd));
 }
+
+// ---------- KPI-Kachel-Helper (Splint-Stil: .card.kpi) ----------
+
+function kpiTile(label, value, sub, pct) {
+  const progress = pct != null
+    ? `<div class="progress"><div class="progress-fill" style="width:${pct}%"></div></div>`
+    : '';
+  return `
+    <div class="card kpi">
+      <div class="label">${label}</div>
+      <div class="value">${value}</div>
+      ${sub ? `<div class="delta">${sub}</div>` : ''}
+      ${progress}
+    </div>`;
+}
+
+// ---------- Charts ----------
 
 function computeMonthlyCumulative(rows, key) {
   let currentMonthKey = null;
@@ -437,13 +460,7 @@ function attachTooltip(containerId, points, formatter, label, showDaily) {
   });
 }
 
-function renderCharts(container, rows, idPrefix) {
-  const charts = [
-    { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
-    { key: 'RowsWritten', label: 'Rows Written', formatter: fmtInt, title: 'Rows Written — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
-    { key: 'StorageBytes', label: 'Storage', formatter: fmtBytes, title: 'Storage-Verlauf', combo: false },
-  ];
-
+function renderChartBlocks(card, rows, idPrefix, charts) {
   charts.forEach((c, cIdx) => {
     if (rows.length < 2) return;
     const chartId = `${idPrefix}-${cIdx}`;
@@ -454,47 +471,40 @@ function renderCharts(container, rows, idPrefix) {
     const block = document.createElement('div');
     block.className = 'chart-block';
     block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
-    container.appendChild(block);
-    setTimeout(() => attachTooltip(chartId, points, formatter, c.label, c.combo), 0);
+    card.appendChild(block);
+    setTimeout(() => attachTooltip(chartId, points, formatter, c.label || c.title, !!c.combo), 0);
   });
 }
+
+// ---------- Turso ----------
 
 function buildDbCard(dbName, rows, idPrefix) {
   const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
   const latest = sorted[sorted.length - 1];
 
   const card = document.createElement('div');
-  card.className = 'db-card';
+  card.className = 'chart-card';
   card.innerHTML = `
-    <div class="db-header">
-      <div class="db-name">${dbName}</div>
-      <div class="db-updated">Stand: ${latest.Datum}</div>
+    <div class="card-header">
+      <div class="card-title">${dbName}</div>
+      <div class="card-updated">Stand: ${latest.Datum}</div>
     </div>
-    <div class="metrics">
-      <div class="metric">
-        <div class="metric-label">Rows Read</div>
-        <div class="metric-value accent">${fmtInt(latest.RowsRead)}</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Rows Written</div>
-        <div class="metric-value accent">${fmtInt(latest.RowsWritten)}</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Bytes Synced</div>
-        <div class="metric-value">${fmtBytes(latest.BytesSynced)}</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Storage</div>
-        <div class="metric-value">${fmtBytes(latest.StorageBytes)}</div>
-      </div>
+    <div class="grid cols-4" style="margin-bottom:6px;">
+      ${kpiTile('Rows Read', fmtInt(latest.RowsRead))}
+      ${kpiTile('Rows Written', fmtInt(latest.RowsWritten))}
+      ${kpiTile('Bytes Synced', fmtBytes(latest.BytesSynced))}
+      ${kpiTile('Storage', fmtBytes(latest.StorageBytes))}
     </div>
   `;
-  renderCharts(card, sorted, idPrefix);
+  renderChartBlocks(card, sorted, idPrefix, [
+    { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
+    { key: 'RowsWritten', label: 'Rows Written', formatter: fmtInt, title: 'Rows Written — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
+    { key: 'StorageBytes', label: 'Storage', formatter: fmtBytes, title: 'Storage-Verlauf', combo: false },
+  ]);
   return card;
 }
 
 function aggregateAcrossDbs(rowsByDb) {
-  // Für jedes Datum: Summe über alle Datenbanken, die an diesem Tag einen Eintrag haben
   const byDate = {};
   Object.values(rowsByDb).forEach(dbRows => {
     dbRows.forEach(r => {
@@ -511,7 +521,6 @@ function aggregateAcrossDbs(rowsByDb) {
 }
 
 function currentStorageTotal(rowsByDb) {
-  // Summe des jeweils letzten (aktuellsten) Storage-Werts pro Datenbank
   let total = 0;
   Object.values(rowsByDb).forEach(dbRows => {
     const sorted = dbRows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
@@ -522,95 +531,49 @@ function currentStorageTotal(rowsByDb) {
 
 function renderForecast(aggRows) {
   const forecast = document.getElementById('forecast');
-  forecast.innerHTML = '';
-
   const last30 = aggRows.slice(-30);
   const avgReads = last30.reduce((sum, r) => sum + (Number(r.RowsRead) || 0), 0) / last30.length;
   const avgWrites = last30.reduce((sum, r) => sum + (Number(r.RowsWritten) || 0), 0) / last30.length;
-
   const forecastReads = avgReads * 30.5;
   const forecastWrites = avgWrites * 30.5;
 
-  const card = document.createElement('div');
-  card.className = 'db-card';
-  card.innerHTML = `
-    <div class="db-header">
-      <div class="db-name">Hochrechnung</div>
-      <div class="db-updated">Ø letzte ${last30.length} Tage × 30.5</div>
-    </div>
-    <div class="metrics">
-      <div class="metric">
-        <div class="metric-label">Rows Read (Forecast)</div>
-        <div class="metric-value accent">${fmtInt(Math.round(forecastReads))}</div>
-        <div class="metric-sub">${fmtPct(forecastReads, LIMITS.RowsRead)} von ${fmtInt(LIMITS.RowsRead)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(forecastReads, LIMITS.RowsRead)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Rows Written (Forecast)</div>
-        <div class="metric-value accent">${fmtInt(Math.round(forecastWrites))}</div>
-        <div class="metric-sub">${fmtPct(forecastWrites, LIMITS.RowsWritten)} von ${fmtInt(LIMITS.RowsWritten)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(forecastWrites, LIMITS.RowsWritten)}%"></div></div>
-      </div>
-    </div>
-  `;
-  forecast.appendChild(card);
+  forecast.innerHTML =
+    kpiTile('Rows Read (Forecast)', fmtInt(Math.round(forecastReads)),
+      `${fmtPct(forecastReads, LIMITS.RowsRead)} von ${fmtInt(LIMITS.RowsRead)} · Ø letzte ${last30.length} Tage × 30.5`,
+      pctWidth(forecastReads, LIMITS.RowsRead)) +
+    kpiTile('Rows Written (Forecast)', fmtInt(Math.round(forecastWrites)),
+      `${fmtPct(forecastWrites, LIMITS.RowsWritten)} von ${fmtInt(LIMITS.RowsWritten)} · Ø letzte ${last30.length} Tage × 30.5`,
+      pctWidth(forecastWrites, LIMITS.RowsWritten));
 }
 
 function renderSummary(rowsByDb) {
   const summary = document.getElementById('summary');
-  summary.innerHTML = '';
-
   const aggRows = aggregateAcrossDbs(rowsByDb);
   const dbCount = Object.keys(rowsByDb).length;
-  const latestDate = aggRows[aggRows.length - 1].Datum;
 
   const monthReads = computeMonthlyCumulative(aggRows, 'RowsRead').slice(-1)[0];
   const monthWrites = computeMonthlyCumulative(aggRows, 'RowsWritten').slice(-1)[0];
   const monthSync = computeMonthlyCumulative(aggRows, 'BytesSynced').slice(-1)[0];
   const storageTotal = currentStorageTotal(rowsByDb);
 
+  summary.innerHTML =
+    kpiTile('Rows Read (Monat)', fmtInt(monthReads), `${fmtPct(monthReads, LIMITS.RowsRead)} von ${fmtInt(LIMITS.RowsRead)}`, pctWidth(monthReads, LIMITS.RowsRead)) +
+    kpiTile('Rows Written (Monat)', fmtInt(monthWrites), `${fmtPct(monthWrites, LIMITS.RowsWritten)} von ${fmtInt(LIMITS.RowsWritten)}`, pctWidth(monthWrites, LIMITS.RowsWritten)) +
+    kpiTile('Bytes Synced (Monat)', fmtBytes(monthSync), `${fmtPct(monthSync, LIMITS.BytesSynced)} von ${fmtBytes(LIMITS.BytesSynced)}`, pctWidth(monthSync, LIMITS.BytesSynced)) +
+    kpiTile('Storage (aktuell)', fmtBytes(storageTotal), `${fmtPct(storageTotal, LIMITS.StorageBytes)} von ${fmtBytes(LIMITS.StorageBytes)}`, pctWidth(storageTotal, LIMITS.StorageBytes)) +
+    kpiTile('Datenbanken', `${dbCount} / ${LIMITS.Databases}`, fmtPct(dbCount, LIMITS.Databases), pctWidth(dbCount, LIMITS.Databases));
+
+  const chartsContainer = document.getElementById('summaryCharts');
+  chartsContainer.innerHTML = '';
   const card = document.createElement('div');
-  card.className = 'db-card';
-  card.innerHTML = `
-    <div class="db-header">
-      <div class="db-name">Alle Datenbanken (${dbCount})</div>
-      <div class="db-updated">Stand: ${latestDate}</div>
-    </div>
-    <div class="metrics five">
-      <div class="metric">
-        <div class="metric-label">Rows Read (Monat)</div>
-        <div class="metric-value accent">${fmtInt(monthReads)}</div>
-        <div class="metric-sub">${fmtPct(monthReads, LIMITS.RowsRead)} von ${fmtInt(LIMITS.RowsRead)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(monthReads, LIMITS.RowsRead)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Rows Written (Monat)</div>
-        <div class="metric-value accent">${fmtInt(monthWrites)}</div>
-        <div class="metric-sub">${fmtPct(monthWrites, LIMITS.RowsWritten)} von ${fmtInt(LIMITS.RowsWritten)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(monthWrites, LIMITS.RowsWritten)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Bytes Synced (Monat)</div>
-        <div class="metric-value">${fmtBytes(monthSync)}</div>
-        <div class="metric-sub">${fmtPct(monthSync, LIMITS.BytesSynced)} von ${fmtBytes(LIMITS.BytesSynced)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(monthSync, LIMITS.BytesSynced)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Storage (aktuell)</div>
-        <div class="metric-value">${fmtBytes(storageTotal)}</div>
-        <div class="metric-sub">${fmtPct(storageTotal, LIMITS.StorageBytes)} von ${fmtBytes(LIMITS.StorageBytes)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(storageTotal, LIMITS.StorageBytes)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Datenbanken</div>
-        <div class="metric-value">${dbCount} / ${LIMITS.Databases}</div>
-        <div class="metric-sub">${fmtPct(dbCount, LIMITS.Databases)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(dbCount, LIMITS.Databases)}%"></div></div>
-      </div>
-    </div>
-  `;
-  renderCharts(card, aggRows, 'summary-chart');
-  summary.appendChild(card);
+  card.className = 'chart-card';
+  card.innerHTML = `<div class="card-header"><div class="card-title">Verlauf — alle Datenbanken</div><div class="card-updated">Stand: ${aggRows[aggRows.length - 1].Datum}</div></div>`;
+  renderChartBlocks(card, aggRows, 'summary-chart', [
+    { key: 'RowsRead', label: 'Rows Read', formatter: fmtInt, title: 'Rows Read — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
+    { key: 'RowsWritten', label: 'Rows Written', formatter: fmtInt, title: 'Rows Written — Säule: Tag · Linie: Monat (kumuliert, Reset am 1.)', combo: true },
+    { key: 'StorageBytes', label: 'Storage', formatter: fmtBytes, title: 'Storage-Verlauf', combo: false },
+  ]);
+  chartsContainer.appendChild(card);
 }
 
 function renderDbSelector(rowsByDb) {
@@ -629,90 +592,73 @@ function renderDbSelector(rowsByDb) {
   if (dbNames.length > 0) showDb(dbNames[0]);
 }
 
-// Neon Free-Plan-Limits (pro Projekt, ausser Projekte-Limit das account-weit gilt)
-const NEON_LIMITS = {
-  StorageBytesPerProject: 0.5 * 1024 ** 3,   // 512 MB
-  ComputeHoursPerProject: 100,               // CU-Stunden/Monat
-  TransferBytesPerProject: 5 * 1024 ** 3,    // 5 GB
-  MaxProjects: 100,
-  MaxBranchesPerProject: 10,                 // aktuell nicht erfasst, siehe README
-};
+function loadData() {
+  document.getElementById('header-status').textContent = 'lädt …';
+  Papa.parse(CSV_URL + '?t=' + Date.now(), {
+    download: true,
+    header: true,
+    delimiter: ";",
+    skipEmptyLines: true,
+    complete: (results) => {
+      const rows = results.data.filter(r => r.Datenbank);
+      if (rows.length === 0) {
+        document.getElementById('summary').innerHTML = '<div class="empty-state">Noch keine Daten vorhanden.</div>';
+        document.getElementById('header-status').textContent = 'keine Daten';
+        return;
+      }
+      const rowsByDb = {};
+      rows.forEach(r => {
+        if (!rowsByDb[r.Datenbank]) rowsByDb[r.Datenbank] = [];
+        rowsByDb[r.Datenbank].push(r);
+      });
+      document.getElementById('header-status').textContent =
+        `${Object.keys(rowsByDb).length} Datenbank(en) · Update ${rows[rows.length - 1].Datum}`;
+      renderForecast(aggregateAcrossDbs(rowsByDb));
+      renderSummary(rowsByDb);
+      renderDbSelector(rowsByDb);
+    },
+    error: (err) => {
+      document.getElementById('summary').innerHTML =
+        `<div class="empty-state">Fehler beim Laden der CSV: ${err.message}</div>`;
+    }
+  });
+}
 
 // ---------- Neon ----------
 
-function fmtHours(seconds) {
-  return `${(Number(seconds) / 3600).toLocaleString('de-CH', { maximumFractionDigits: 1 })} h`;
-}
-
-function buildNeonDbCard(projectName, rows, idPrefix) {
+function buildNeonDbCard(name, rows, idPrefix) {
   const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
   const latest = sorted[sorted.length - 1];
+
   const computeSeconds = Number(latest.ComputeTimeSeconds) || 0;
   const computeLimitSeconds = NEON_LIMITS.ComputeHoursPerProject * 3600;
-  const storageBytes = Number(latest.StorageBytes) || 0;
   const transferBytes = Number(latest.DataTransferBytes) || 0;
+  const storageBytes = Number(latest.StorageBytes) || 0;
 
   const card = document.createElement('div');
-  card.className = 'db-card';
+  card.className = 'chart-card';
   card.innerHTML = `
-    <div class="db-header">
-      <div class="db-name">${projectName}</div>
-      <div class="db-updated">Stand: ${latest.Datum}</div>
+    <div class="card-header">
+      <div class="card-title">${name}</div>
+      <div class="card-updated">Stand: ${latest.Datum}</div>
     </div>
-    <div class="metrics five">
-      <div class="metric">
-        <div class="metric-label">Compute Time (Periode)</div>
-        <div class="metric-value accent">${(computeSeconds / 3600).toLocaleString('de-CH', { maximumFractionDigits: 1 })} CU-h</div>
-        <div class="metric-sub">${fmtPct(computeSeconds, computeLimitSeconds)} von ${NEON_LIMITS.ComputeHoursPerProject} CU-h</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(computeSeconds, computeLimitSeconds)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Active Time (Periode)</div>
-        <div class="metric-value">${fmtHours(latest.ActiveTimeSeconds)}</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Written Data (Periode)</div>
-        <div class="metric-value">${fmtBytes(latest.WrittenDataBytes)}</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Data Transfer (Periode)</div>
-        <div class="metric-value">${fmtBytes(transferBytes)}</div>
-        <div class="metric-sub">${fmtPct(transferBytes, NEON_LIMITS.TransferBytesPerProject)} von ${fmtBytes(NEON_LIMITS.TransferBytesPerProject)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(transferBytes, NEON_LIMITS.TransferBytesPerProject)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Storage (aktuell)</div>
-        <div class="metric-value">${fmtBytes(storageBytes)}</div>
-        <div class="metric-sub">${fmtPct(storageBytes, NEON_LIMITS.StorageBytesPerProject)} von ${fmtBytes(NEON_LIMITS.StorageBytesPerProject)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(storageBytes, NEON_LIMITS.StorageBytesPerProject)}%"></div></div>
-      </div>
+    <div class="grid cols-4" style="margin-bottom:6px;">
+      ${kpiTile('Compute Time (Periode)', fmtHours(computeSeconds), `${fmtPct(computeSeconds, computeLimitSeconds)} von ${NEON_LIMITS.ComputeHoursPerProject} CU-h`, pctWidth(computeSeconds, computeLimitSeconds))}
+      ${kpiTile('Active Time (Periode)', fmtHours(latest.ActiveTimeSeconds))}
+      ${kpiTile('Data Transfer (Periode)', fmtBytes(transferBytes), `${fmtPct(transferBytes, NEON_LIMITS.TransferBytesPerProject)} von ${fmtBytes(NEON_LIMITS.TransferBytesPerProject)}`, pctWidth(transferBytes, NEON_LIMITS.TransferBytesPerProject))}
+      ${kpiTile('Storage (aktuell)', fmtBytes(storageBytes), `${fmtPct(storageBytes, NEON_LIMITS.StorageBytesPerProject)} von ${fmtBytes(NEON_LIMITS.StorageBytesPerProject)}`, pctWidth(storageBytes, NEON_LIMITS.StorageBytesPerProject))}
     </div>
   `;
-
-  if (sorted.length >= 2) {
-    const charts = [
-      { key: 'ComputeTimeSeconds', formatter: fmtHours, title: 'Compute Time — Verlauf (kumuliert seit Periodenbeginn, Reset durch Neon)' },
-      { key: 'WrittenDataBytes', formatter: fmtBytes, title: 'Written Data — Verlauf' },
-      { key: 'StorageBytes', formatter: fmtBytes, title: 'Storage — Verlauf' },
-    ];
-    charts.forEach((c, cIdx) => {
-      const chartId = `${idPrefix}-${cIdx}`;
-      const { svg, points, formatter } = buildSparkline(sorted, c.key, c.formatter, chartId);
-      const block = document.createElement('div');
-      block.className = 'chart-block';
-      block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
-      card.appendChild(block);
-      setTimeout(() => attachTooltip(chartId, points, formatter, c.title, false), 0);
-    });
-  }
-
+  renderChartBlocks(card, sorted, idPrefix, [
+    { key: 'ComputeTimeSeconds', formatter: fmtHours, title: 'Compute Time — Verlauf (kumuliert seit Periodenbeginn, Reset durch Neon)' },
+    { key: 'WrittenDataBytes', formatter: fmtBytes, title: 'Written Data — Verlauf' },
+    { key: 'StorageBytes', formatter: fmtBytes, title: 'Storage — Verlauf' },
+  ]);
   return card;
 }
 
 function renderNeonSummary(rowsByProject) {
   const summary = document.getElementById('neonSummary');
-  summary.innerHTML = '';
-
   const projectCount = Object.keys(rowsByProject).length;
   let totalCompute = 0, totalActive = 0, totalWritten = 0, totalTransfer = 0, totalStorage = 0;
   let latestDate = '';
@@ -728,57 +674,19 @@ function renderNeonSummary(rowsByProject) {
     if (!latestDate || latest.Datum > latestDate) latestDate = latest.Datum;
   });
 
-  // Kapazität = Limit pro Projekt × Anzahl Projekte (Free-Plan-Limits gelten pro Projekt)
   const storageLimitTotal = projectCount * NEON_LIMITS.StorageBytesPerProject;
   const computeLimitTotalSeconds = projectCount * NEON_LIMITS.ComputeHoursPerProject * 3600;
   const transferLimitTotal = projectCount * NEON_LIMITS.TransferBytesPerProject;
   const totalComputeHours = totalCompute / 3600;
   const computeLimitTotalHours = projectCount * NEON_LIMITS.ComputeHoursPerProject;
 
-  const card = document.createElement('div');
-  card.className = 'db-card';
-  card.innerHTML = `
-    <div class="db-header">
-      <div class="db-name">Alle Projekte (${projectCount})</div>
-      <div class="db-updated">Stand: ${latestDate}</div>
-    </div>
-    <div class="metrics five">
-      <div class="metric">
-        <div class="metric-label">Compute Time (Periode)</div>
-        <div class="metric-value accent">${totalComputeHours.toLocaleString('de-CH', { maximumFractionDigits: 1 })} CU-h</div>
-        <div class="metric-sub">${fmtPct(totalCompute, computeLimitTotalSeconds)} von ${computeLimitTotalHours.toLocaleString('de-CH')} CU-h</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(totalCompute, computeLimitTotalSeconds)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Active Time (Periode)</div>
-        <div class="metric-value">${fmtHours(totalActive)}</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Written Data (Periode)</div>
-        <div class="metric-value">${fmtBytes(totalWritten)}</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Data Transfer (Periode)</div>
-        <div class="metric-value">${fmtBytes(totalTransfer)}</div>
-        <div class="metric-sub">${fmtPct(totalTransfer, transferLimitTotal)} von ${fmtBytes(transferLimitTotal)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(totalTransfer, transferLimitTotal)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Storage (aktuell)</div>
-        <div class="metric-value">${fmtBytes(totalStorage)}</div>
-        <div class="metric-sub">${fmtPct(totalStorage, storageLimitTotal)} von ${fmtBytes(storageLimitTotal)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(totalStorage, storageLimitTotal)}%"></div></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Projekte</div>
-        <div class="metric-value">${projectCount} / ${NEON_LIMITS.MaxProjects}</div>
-        <div class="metric-sub">${fmtPct(projectCount, NEON_LIMITS.MaxProjects)}</div>
-        <div class="progress"><div class="progress-fill" style="width:${pctWidth(projectCount, NEON_LIMITS.MaxProjects)}%"></div></div>
-      </div>
-    </div>
-    <div class="metric-sub" style="margin-top:8px;">Storage/Compute/Transfer-Limits gelten pro Projekt (Free-Plan) und werden hier als Summe über alle ${projectCount} Projekte dargestellt. Branches-Limit (10/Projekt) wird aktuell nicht erfasst.</div>
-  `;
-  summary.appendChild(card);
+  summary.innerHTML =
+    kpiTile('Compute Time (Periode)', `${totalComputeHours.toLocaleString('de-CH', { maximumFractionDigits: 1 })} CU-h`, `${fmtPct(totalCompute, computeLimitTotalSeconds)} von ${computeLimitTotalHours.toLocaleString('de-CH')} CU-h`, pctWidth(totalCompute, computeLimitTotalSeconds)) +
+    kpiTile('Active Time (Periode)', fmtHours(totalActive)) +
+    kpiTile('Written Data (Periode)', fmtBytes(totalWritten)) +
+    kpiTile('Data Transfer (Periode)', fmtBytes(totalTransfer), `${fmtPct(totalTransfer, transferLimitTotal)} von ${fmtBytes(transferLimitTotal)}`, pctWidth(totalTransfer, transferLimitTotal)) +
+    kpiTile('Storage (aktuell)', fmtBytes(totalStorage), `${fmtPct(totalStorage, storageLimitTotal)} von ${fmtBytes(storageLimitTotal)}`, pctWidth(totalStorage, storageLimitTotal)) +
+    kpiTile('Projekte', `${projectCount} / ${NEON_LIMITS.MaxProjects}`, `Stand: ${latestDate}`, pctWidth(projectCount, NEON_LIMITS.MaxProjects));
 }
 
 function renderNeonProjectSelector(rowsByProject) {
@@ -824,153 +732,91 @@ function loadNeonData() {
   });
 }
 
-// ---------- GitHub ----------
-// Werte sind Tagesdeltas (Vortag), analog Turso. Basiert auf der Run-Timing-API
-// (/repos/{owner}/{repo}/actions/runs/{run_id}/timing) statt der Billing-API,
-// da diese Org keinen API-Zugriff auf Billing-Daten hat (nur Enterprise-Orgs).
-// Daher keine Kosten/Limits darstellbar, nur die tatsächlichen Minuten pro OS,
-// Anzahl gezählter Runs und die Git-Repo-Grösse als Storage-Näherung.
+// ---------- Cloudflare ----------
 
-function buildGithubCard(rows) {
+function buildCloudflareCard(rows) {
   const sorted = rows.slice().sort((a, b) => parseDatum(a.Datum) - parseDatum(b.Datum));
   const latest = sorted[sorted.length - 1];
 
-  const totalMinutes = Number(latest.ActionsMinutesTotal) || 0;
-  const runsCounted = Number(latest.RunsGezaehlt) || 0;
-  const repoSizeKB = Number(latest.RepoSizeKB) || 0;
-  const cacheBytes = Number(latest.CacheBytes) || 0;
+  const workersReq = Number(latest.WorkersRequests) || 0;
+  const workersErr = Number(latest.WorkersErrors) || 0;
+  const kvWrites = Number(latest.KVWrites) || 0;
+  const kvStorage = Number(latest.KVStorageBytes) || 0;
+  const d1RowsWritten = Number(latest.D1RowsWritten) || 0;
+  const d1Storage = Number(latest.D1StorageBytes) || 0;
+  const r2Storage = Number(latest.R2StorageBytes) || 0;
+  const r2ClassAForecast = (Number(latest.R2ClassAOps) || 0) * 30.5;
+  const r2ClassBForecast = (Number(latest.R2ClassBOps) || 0) * 30.5;
 
+  document.getElementById('cloudflareSummary').innerHTML =
+    kpiTile('Workers Requests (Tag)', fmtInt(workersReq), `${fmtPct(workersReq, CF_LIMITS.WorkersRequestsPerDay)} von ${fmtInt(CF_LIMITS.WorkersRequestsPerDay)} · ${fmtInt(workersErr)} Fehler`, pctWidth(workersReq, CF_LIMITS.WorkersRequestsPerDay)) +
+    kpiTile('KV Writes (Tag)', fmtInt(kvWrites), `${fmtPct(kvWrites, CF_LIMITS.KVWritesPerDay)} von ${fmtInt(CF_LIMITS.KVWritesPerDay)}`, pctWidth(kvWrites, CF_LIMITS.KVWritesPerDay)) +
+    kpiTile('KV Storage (Snapshot)', fmtBytes(kvStorage), `${fmtPct(kvStorage, CF_LIMITS.KVStorageBytes)} von ${fmtBytes(CF_LIMITS.KVStorageBytes)}`, pctWidth(kvStorage, CF_LIMITS.KVStorageBytes)) +
+    kpiTile('D1 Rows Written (Tag)', fmtInt(d1RowsWritten), `${fmtPct(d1RowsWritten, CF_LIMITS.D1RowsWrittenPerDay)} von ${fmtInt(CF_LIMITS.D1RowsWrittenPerDay)}`, pctWidth(d1RowsWritten, CF_LIMITS.D1RowsWrittenPerDay)) +
+    kpiTile('D1 Storage (Snapshot)', fmtBytes(d1Storage), `${fmtPct(d1Storage, CF_LIMITS.D1StorageBytes)} von ${fmtBytes(CF_LIMITS.D1StorageBytes)}`, pctWidth(d1Storage, CF_LIMITS.D1StorageBytes)) +
+    kpiTile('R2 Storage (Snapshot)', fmtBytes(r2Storage), `${fmtPct(r2Storage, CF_LIMITS.R2StorageBytes)} von ${fmtBytes(CF_LIMITS.R2StorageBytes)}`, pctWidth(r2Storage, CF_LIMITS.R2StorageBytes)) +
+    kpiTile('R2 Class A Ops (Monats-Forecast)', fmtInt(Math.round(r2ClassAForecast)), `${fmtPct(r2ClassAForecast, CF_LIMITS.R2ClassAOpsPerMonth)} von ${fmtInt(CF_LIMITS.R2ClassAOpsPerMonth)}`, pctWidth(r2ClassAForecast, CF_LIMITS.R2ClassAOpsPerMonth)) +
+    kpiTile('R2 Class B Ops (Monats-Forecast)', fmtInt(Math.round(r2ClassBForecast)), `${fmtPct(r2ClassBForecast, CF_LIMITS.R2ClassBOpsPerMonth)} von ${fmtInt(CF_LIMITS.R2ClassBOpsPerMonth)}`, pctWidth(r2ClassBForecast, CF_LIMITS.R2ClassBOpsPerMonth));
+
+  const chartsContainer = document.getElementById('cloudflareCharts');
+  chartsContainer.innerHTML = '';
+  if (sorted.length < 2) return;
   const card = document.createElement('div');
-  card.className = 'db-card';
-  card.innerHTML = `
-    <div class="db-header">
-      <div class="db-name">Actions &amp; Storage</div>
-      <div class="db-updated">Stand: ${latest.Datum}</div>
-    </div>
-    <div class="metrics five">
-      <div class="metric">
-        <div class="metric-label">Actions Minuten (Tag)</div>
-        <div class="metric-value accent">${totalMinutes.toLocaleString('de-CH', { maximumFractionDigits: 1 })} min</div>
-        <div class="metric-sub">${runsCounted} Run(s)</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Linux / macOS / Windows</div>
-        <div class="metric-value" style="font-size:13px;">${Number(latest.ActionsMinutesLinux).toLocaleString('de-CH', { maximumFractionDigits: 1 })} / ${Number(latest.ActionsMinutesMacOS).toLocaleString('de-CH', { maximumFractionDigits: 1 })} / ${Number(latest.ActionsMinutesWindows).toLocaleString('de-CH', { maximumFractionDigits: 1 })}</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Repo-Grösse (Git, gesamt)</div>
-        <div class="metric-value">${fmtBytes(repoSizeKB * 1024)}</div>
-        <div class="metric-sub">Näherung, nicht identisch mit Actions-Storage</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Actions Cache (aktuell)</div>
-        <div class="metric-value">${fmtBytes(cacheBytes)}</div>
-      </div>
-    </div>
-  `;
-
-  if (sorted.length >= 2) {
-    const charts = [
-      { key: 'ActionsMinutesTotal', formatter: (v) => `${Number(v).toLocaleString('de-CH')} min`, title: 'Actions Minuten — Verlauf (pro Tag)' },
-      { key: 'CacheBytes', formatter: fmtBytes, title: 'Actions Cache — Verlauf' },
-    ];
-    charts.forEach((c, cIdx) => {
-      const chartId = `github-${cIdx}`;
-      const { svg, points, formatter } = buildSparkline(sorted, c.key, c.formatter, chartId);
-      const block = document.createElement('div');
-      block.className = 'chart-block';
-      block.innerHTML = `<div class="chart-title">${c.title}</div>${svg}`;
-      card.appendChild(block);
-      setTimeout(() => attachTooltip(chartId, points, formatter, c.title, false), 0);
-    });
-  }
-
-  return card;
+  card.className = 'chart-card';
+  card.innerHTML = `<div class="card-header"><div class="card-title">Verlauf</div><div class="card-updated">Stand: ${latest.Datum}</div></div>`;
+  renderChartBlocks(card, sorted, 'cloudflare-chart', [
+    { key: 'WorkersRequests', formatter: fmtInt, title: 'Workers Requests — Verlauf (pro Tag)' },
+    { key: 'KVWrites', formatter: fmtInt, title: 'KV Writes — Verlauf (pro Tag)' },
+    { key: 'D1RowsWritten', formatter: fmtInt, title: 'D1 Rows Written — Verlauf (pro Tag)' },
+    { key: 'R2StorageBytes', formatter: fmtBytes, title: 'R2 Storage — Verlauf' },
+  ]);
+  chartsContainer.appendChild(card);
 }
 
-function loadGithubData() {
-  Papa.parse(GITHUB_CSV_URL + '?t=' + Date.now(), {
+function loadCloudflareData() {
+  Papa.parse(CLOUDFLARE_CSV_URL + '?t=' + Date.now(), {
     download: true,
     header: true,
     delimiter: ";",
     skipEmptyLines: true,
     complete: (results) => {
       const rows = results.data.filter(r => r.Datum);
-      const summary = document.getElementById('githubSummary');
       if (rows.length === 0) {
-        summary.innerHTML = '<div class="empty-state">Noch keine GitHub-Daten vorhanden.</div>';
+        document.getElementById('cloudflareSummary').innerHTML = '<div class="empty-state">Noch keine Cloudflare-Daten vorhanden.</div>';
         return;
       }
-      summary.innerHTML = '';
-      summary.appendChild(buildGithubCard(rows));
+      buildCloudflareCard(rows);
     },
     error: (err) => {
-      document.getElementById('githubSummary').innerHTML =
-        `<div class="empty-state">Fehler beim Laden der GitHub-CSV: ${err.message}</div>`;
+      document.getElementById('cloudflareSummary').innerHTML =
+        `<div class="empty-state">Fehler beim Laden der Cloudflare-CSV: ${err.message}</div>`;
     }
   });
 }
 
 // ---------- Tab-Umschaltung ----------
 
-function switchHosting(hosting) {
-  document.getElementById('tursoView').style.display = hosting === 'turso' ? '' : 'none';
-  document.getElementById('neonView').style.display = hosting === 'neon' ? '' : 'none';
-  document.getElementById('githubView').style.display = hosting === 'github' ? '' : 'none';
-  document.getElementById('tabTurso').classList.toggle('active', hosting === 'turso');
-  document.getElementById('tabNeon').classList.toggle('active', hosting === 'neon');
-  document.getElementById('tabGithub').classList.toggle('active', hosting === 'github');
-  if (hosting === 'neon') loadNeonData();
-  if (hosting === 'github') loadGithubData();
-}
-
-document.getElementById('tabTurso').addEventListener('click', () => switchHosting('turso'));
-document.getElementById('tabNeon').addEventListener('click', () => switchHosting('neon'));
-document.getElementById('tabGithub').addEventListener('click', () => switchHosting('github'));
-
-// ---------- Turso Ladevorgang ----------
-
-function loadData() {
-  document.getElementById('subtitle').textContent = 'lädt …';
-  Papa.parse(CSV_URL + '?t=' + Date.now(), {
-    download: true,
-    header: true,
-    delimiter: ";",
-    skipEmptyLines: true,
-    complete: (results) => {
-      const rows = results.data.filter(r => r.Datenbank);
-      if (rows.length === 0) {
-        document.getElementById('summary').innerHTML = '<div class="empty-state">Noch keine Daten vorhanden.</div>';
-        document.getElementById('subtitle').textContent = 'keine Daten';
-        return;
-      }
-      const rowsByDb = {};
-      rows.forEach(r => {
-        if (!rowsByDb[r.Datenbank]) rowsByDb[r.Datenbank] = [];
-        rowsByDb[r.Datenbank].push(r);
-      });
-      document.getElementById('subtitle').textContent =
-        `${Object.keys(rowsByDb).length} Datenbank(en) · letztes Update ${rows[rows.length - 1].Datum}`;
-      renderForecast(aggregateAcrossDbs(rowsByDb));
-      renderSummary(rowsByDb);
-      renderDbSelector(rowsByDb);
-    },
-    error: (err) => {
-      document.getElementById('summary').innerHTML =
-        `<div class="empty-state">Fehler beim Laden der CSV: ${err.message}</div>`;
-    }
+function switchView(view) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById(`view-${view}`).classList.add('active');
+  document.querySelectorAll('nav.tabs button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === view);
   });
+  if (view === 'neon') loadNeonData();
+  if (view === 'cloudflare') loadCloudflareData();
 }
+
+document.querySelectorAll('nav.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => switchView(btn.dataset.view));
+});
 
 document.getElementById('refreshBtn').addEventListener('click', () => {
-  if (document.getElementById('tabNeon').classList.contains('active')) {
-    loadNeonData();
-  } else if (document.getElementById('tabGithub').classList.contains('active')) {
-    loadGithubData();
-  } else {
-    loadData();
-  }
+  const activeView = document.querySelector('nav.tabs button.active').dataset.view;
+  if (activeView === 'neon') loadNeonData();
+  else if (activeView === 'cloudflare') loadCloudflareData();
+  else loadData();
 });
+
 loadData();
 </script>
 </body>
