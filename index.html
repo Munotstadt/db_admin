@@ -410,24 +410,33 @@ function buildDiffBarChart(rows, key, formatter, id, opts) {
   const w = 600, h = 110, padL = 4, padR = 4, padT = 10, padB = 18;
   const rawValues = rows.map(r => Number(r[key]) || 0);
   const dailyValues = rawValues.map((v, i) => i === 0 ? v : Math.max(v - rawValues[i - 1], 0));
+  const cumulativeValues = rawValues; // Rohwert ist bereits kumuliert seit Periodenbeginn (Neon-seitig)
 
   const maxDaily = Math.max(...dailyValues, opts.threshold || 0, 1);
+  const maxCumulative = Math.max(...cumulativeValues, 1);
   const innerH = h - padT - padB;
   const n = rows.length;
   const slot = (w - padL - padR) / n;
   const barW = Math.max(slot * 0.5, 2);
 
   let bars = '';
-  const points = dailyValues.map((v, i) => {
+  dailyValues.forEach((v, i) => {
     const barH = (v / maxDaily) * innerH;
     const x = padL + i * slot + (slot - barW) / 2;
     const y = padT + innerH - barH;
     bars += `<rect class="bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(barH, 0.5).toFixed(1)}"></rect>`;
-    return { x: x + barW / 2, y, v, datum: rows[i]['Datum'] };
   });
 
+  const linePoints = cumulativeValues.map((v, i) => {
+    const x = padL + i * slot + slot / 2;
+    const y = padT + (1 - v / maxCumulative) * innerH;
+    return { x, y, daily: dailyValues[i], cumulative: v, datum: rows[i]['Datum'] };
+  });
+  const pathD = linePoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
   let dots = '';
-  points.forEach((p, i) => {
+  linePoints.forEach((p, i) => {
+    dots += `<circle class="dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5"></circle>`;
     dots += `<circle class="dot-hit" data-idx="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="12"></circle>`;
   });
 
@@ -445,12 +454,13 @@ function buildDiffBarChart(rows, key, formatter, id, opts) {
       <line class="grid-line" x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}"></line>
       ${bars}
       ${thresholdLine}
+      <path class="line" d="${pathD}"></path>
       ${dots}
       <text class="axis-label" x="${padL}" y="${h - 4}">${firstLabel}</text>
       <text class="axis-label" x="${w - padR}" y="${h - 4}" text-anchor="end">${lastLabel}</text>
     </svg>`;
 
-  return { svg, points, formatter };
+  return { svg, points: linePoints, formatter };
 }
 
 function buildSparkline(rows, key, formatter, id) {
@@ -501,6 +511,8 @@ function attachTooltip(containerId, points, formatter, label, showDaily) {
       tooltip.style.top = (clientY - 30) + 'px';
       if (showDaily === 'combo') {
         tooltip.innerHTML = `${p.datum}<br>Tag: <b>${formatter(p.daily)}</b><br>Monat (kum.): <b>${formatter(p.cumulative)}</b>`;
+      } else if (showDaily === 'diffBar') {
+        tooltip.innerHTML = `${p.datum}<br>Tag (Δ): <b>${formatter(p.daily)}</b><br>Periode (kum.): <b>${formatter(p.cumulative)}</b>`;
       } else {
         tooltip.innerHTML = `${p.datum}<br>${label}: <b>${formatter(p.v)}</b>`;
       }
@@ -709,7 +721,7 @@ function buildNeonDbCard(name, rows, idPrefix) {
     </div>
   `;
   renderChartBlocks(card, sorted, idPrefix, [
-    { key: 'ComputeTimeSeconds', label: 'Compute Time', formatter: fmtHours, title: 'Compute Time — Säule: Tag (Δ zum Vortag) · gepunktet: 3.22 h/Tag', diffBar: true, threshold: 3.22 * 3600 },
+    { key: 'ComputeTimeSeconds', label: 'Compute Time', formatter: fmtHours, title: 'Compute Time — Säule: Tag (Δ zum Vortag) · Linie: Periode (kumuliert) · gepunktet: 3.22 h/Tag', diffBar: true, threshold: 3.22 * 3600 },
     { key: 'WrittenDataBytes', formatter: fmtBytes, title: 'Written Data — Verlauf' },
     { key: 'StorageBytes', formatter: fmtBytes, title: 'Storage — Verlauf' },
   ]);
