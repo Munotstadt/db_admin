@@ -507,14 +507,25 @@ function attachTooltip(containerId, points, formatter, label, showDaily) {
     const p = points[idx];
     const show = (clientX, clientY) => {
       tooltip.style.display = 'block';
-      tooltip.style.left = (clientX + 12) + 'px';
       tooltip.style.top = (clientY - 30) + 'px';
+      // Erst unsichtbar links positionieren, um die tatsächliche Breite zu messen
+      tooltip.style.left = '-9999px';
+      tooltip.style.right = 'auto';
       if (showDaily === 'combo') {
         tooltip.innerHTML = `${p.datum}<br>Tag: <b>${formatter(p.daily)}</b><br>Monat (kum.): <b>${formatter(p.cumulative)}</b>`;
       } else if (showDaily === 'diffBar') {
         tooltip.innerHTML = `${p.datum}<br>Tag (Δ): <b>${formatter(p.daily)}</b><br>Periode (kum.): <b>${formatter(p.cumulative)}</b>`;
       } else {
         tooltip.innerHTML = `${p.datum}<br>${label}: <b>${formatter(p.v)}</b>`;
+      }
+      const tw = tooltip.offsetWidth;
+      const margin = 8;
+      if (clientX + 12 + tw > window.innerWidth - margin) {
+        tooltip.style.left = 'auto';
+        tooltip.style.right = (window.innerWidth - clientX + 12) + 'px';
+      } else {
+        tooltip.style.right = 'auto';
+        tooltip.style.left = (clientX + 12) + 'px';
       }
     };
     hit.addEventListener('mousemove', e => show(e.clientX, e.clientY));
