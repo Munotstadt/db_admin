@@ -76,3 +76,8 @@ Datum;Datenbank;RowsRead;RowsWritten;BytesSynced;StorageBytes
 25.08.2026;munotstadtmeteodb;169935;2904;0;3600384
 25.08.2026;munotstadtsecuritydb;3505105;5316;0;27676672
 25.08.2026;munotstadttest;0;0;0;20480
+26.08.2026;munostadtadtseetstrasse52bdb;10154;5;0;1552384
+26.08.2026;munotstadtenergydb;34265;560;0;950272
+26.08.2026;munotstadtmeteodb;127750;2677;0;3600384
+26.08.2026;munotstadtsecuritydb;4606344;2899;0;27787264
+26.08.2026;munotstadttest;0;0;0;20480
