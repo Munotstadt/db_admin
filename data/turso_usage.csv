@@ -121,3 +121,8 @@ Datum;Datenbank;RowsRead;RowsWritten;BytesSynced;StorageBytes
 03.09.2026;munotstadtmeteodb;111751;1256;0;3612672
 03.09.2026;munotstadtsecuritydb;13829262;166626;0;34869248
 03.09.2026;munotstadttest;0;0;0;20480
+04.09.2026;munostadtadtseetstrasse52bdb;20446;5;0;1560576
+04.09.2026;munotstadtenergydb;7580;0;0;1011712
+04.09.2026;munotstadtmeteodb;111863;1261;0;3616768
+04.09.2026;munotstadtsecuritydb;2401228;158400;0;35532800
+04.09.2026;munotstadttest;0;0;0;20480
