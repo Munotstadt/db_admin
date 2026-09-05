@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>DB Admin – Tasks</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#E30613; --bg:#f7f7f8; --card:#fff; --border:#e5e5e8;
+    --text:#1a1a1a; --muted:#6b6b70;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,sans-serif;}
+  .topbar{display:flex;align-items:center;gap:.6rem;padding:1rem 1.5rem;background:#fff;border-bottom:1px solid var(--border);}
+  .topbar .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.1rem;}
+  .topbar .brand span{color:var(--red);}
+  nav.tabs{display:flex;gap:.5rem;padding:0 1.5rem;background:#fff;border-bottom:1px solid var(--border);}
+  nav.tabs a{padding:.8rem 1rem;text-decoration:none;color:var(--muted);font-size:.9rem;border-bottom:2px solid transparent;}
+  nav.tabs a.active{color:var(--text);border-color:var(--red);font-weight:500;}
+  main{padding:1.5rem;max-width:1100px;margin:0 auto;}
+  .toolbar{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;}
+  .toolbar select,.toolbar input{padding:.5rem .7rem;border:1px solid var(--border);border-radius:6px;font-family:inherit;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;margin-bottom:.7rem;}
+  .card .row1{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;}
+  .card h3{margin:0;font-size:1rem;font-family:'Space Grotesk',sans-serif;}
+  .meta{font-family:'IBM Plex Mono',monospace;font-size:.75rem;color:var(--muted);}
+  .note{margin:.5rem 0 0;font-size:.9rem;color:#333;white-space:pre-wrap;}
+  .badge{display:inline-block;padding:.15rem .5rem;border-radius:20px;font-size:.7rem;font-family:'IBM Plex Mono',monospace;}
+  .badge.open{background:#fde8e8;color:var(--red);}
+  .badge.in_progress{background:#fff3cd;color:#8a6d00;}
+  .badge.done{background:#e5f6e8;color:#1e7a34;text-decoration:line-through;}
+  .actions{display:flex;gap:.4rem;margin-top:.6rem;}
+  .actions button{font-size:.78rem;padding:.3rem .6rem;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;}
+  .actions button:hover{border-color:var(--red);color:var(--red);}
+  #status{font-size:.85rem;color:var(--muted);margin-bottom:1rem;}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">DB <span>Admin</span></div>
+  </div>
+  <nav class="tabs">
+    <a href="index.html">Neon</a>
+    <a href="index.html#turso">Turso</a>
+    <a href="index.html#cloudflare">Cloudflare</a>
+    <a href="tasks.html" class="active">Tasks</a>
+  </nav>
+  <main>
+    <div class="toolbar">
+      <select id="filterStatus">
+        <option value="">Alle Status</option>
+        <option value="open" selected>Offen</option>
+        <option value="in_progress">In Arbeit</option>
+        <option value="done">Erledigt</option>
+      </select>
+      <input id="filterApp" placeholder="Nach App filtern…" style="flex:1;min-width:150px;">
+      <button id="refreshBtn" style="padding:.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;">↻ Aktualisieren</button>
+    </div>
+    <div id="status">Lade Tasks…</div>
+    <div id="list"></div>
+  </main>
+
+<script>
+  // Basis-URL des Cloudflare Workers (D1-API), per Access/Google geschützt
+  const API_BASE = "https://db-admin-tasks.ph-gnaedinger.workers.dev";
+
+  const listEl = document.getElementById('list');
+  const statusEl = document.getElementById('status');
+  const filterStatus = document.getElementById('filterStatus');
+  const filterApp = document.getElementById('filterApp');
+
+  async function loadTasks(){
+    statusEl.textContent = 'Lade Tasks…';
+    try {
+      const st = filterStatus.value;
+      const res = await fetch(`${API_BASE}/tasks${st ? '?status='+st : ''}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      let tasks = await res.json();
+      const appFilter = filterApp.value.trim().toLowerCase();
+      if (appFilter) tasks = tasks.filter(t => t.SourceApp.toLowerCase().includes(appFilter));
+      render(tasks);
+      statusEl.textContent = `${tasks.length} Task(s)`;
+    } catch(e) {
+      statusEl.textContent = 'Fehler beim Laden: ' + e.message + ' (Login via Cloudflare Access nötig?)';
+    }
+  }
+
+  function render(tasks){
+    listEl.innerHTML = '';
+    if (!tasks.length){ listEl.innerHTML = '<p style="color:var(--muted)">Keine Tasks.</p>'; return; }
+    for (const t of tasks){
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `
+        <div class="row1">
+          <h3>${escapeHtml(t.Title)}</h3>
+          <span class="badge ${t.Status}">${t.Status}</span>
+        </div>
+        <div class="meta">${escapeHtml(t.SourceApp)} · ${new Date(t.CreatedAt).toLocaleString('de-CH')}${t.SourceUrl ? ' · <a href="'+t.SourceUrl+'" target="_blank">Quelle</a>' : ''}</div>
+        ${t.Note ? `<p class="note">${escapeHtml(t.Note)}</p>` : ''}
+        <div class="actions">
+          ${t.Status !== 'in_progress' ? `<button onclick="setStatus(${t.TaskID},'in_progress')">In Arbeit</button>` : ''}
+          ${t.Status !== 'done' ? `<button onclick="setStatus(${t.TaskID},'done')">Erledigt</button>` : ''}
+          ${t.Status !== 'open' ? `<button onclick="setStatus(${t.TaskID},'open')">Wieder öffnen</button>` : ''}
+          <button onclick="deleteTask(${t.TaskID})">Löschen</button>
+        </div>`;
+      listEl.appendChild(div);
+    }
+  }
+
+  async function setStatus(id, status){
+    await fetch(`${API_BASE}/tasks/${id}`, {
+      method: 'PATCH', credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ status })
+    });
+    loadTasks();
+  }
+
+  async function deleteTask(id){
+    if (!confirm('Task wirklich löschen?')) return;
+    await fetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE', credentials: 'include' });
+    loadTasks();
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  document.getElementById('refreshBtn').onclick = loadTasks;
+  filterStatus.onchange = loadTasks;
+  filterApp.oninput = () => { clearTimeout(window._ft); window._ft = setTimeout(loadTasks, 300); };
+
+  loadTasks();
+</script>
+</body>
+</html>
