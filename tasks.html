@@ -56,6 +56,30 @@
       </select>
       <input id="filterApp" placeholder="Nach App filtern…" style="flex:1;min-width:150px;">
       <button id="refreshBtn" style="padding:.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;">↻ Aktualisieren</button>
+      <button id="newTaskBtn" style="padding:.5rem 1rem;border-radius:6px;border:1px solid var(--red);background:var(--red);color:#fff;cursor:pointer;">+ Neuer Task</button>
+    </div>
+
+    <div id="newTaskOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:10px;padding:1.4rem;width:min(420px,90vw);">
+        <h3 style="margin:0 0 .8rem;font-family:'Space Grotesk',sans-serif;">Neuer Task</h3>
+        <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">App/Tool</label>
+        <input id="nt-app" placeholder="z.B. db_admin" style="width:100%;padding:.5rem;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;">
+        <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">Titel</label>
+        <input id="nt-title" placeholder="Kurze Zusammenfassung" style="width:100%;padding:.5rem;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;">
+        <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">Notiz</label>
+        <textarea id="nt-note" style="width:100%;min-height:80px;padding:.5rem;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;"></textarea>
+        <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">Priorität</label>
+        <select id="nt-prio" style="width:100%;padding:.5rem;border:1px solid #ddd;border-radius:6px;">
+          <option value="low">Niedrig</option>
+          <option value="normal" selected>Normal</option>
+          <option value="high">Hoch</option>
+        </select>
+        <div id="nt-status" style="font-size:.8rem;margin-top:.5rem;color:#555;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:1rem;">
+          <button id="nt-cancel" style="padding:.5rem 1rem;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;">Abbrechen</button>
+          <button id="nt-save" style="padding:.5rem 1rem;border-radius:6px;border:1px solid var(--red);background:var(--red);color:#fff;cursor:pointer;">Speichern</button>
+        </div>
+      </div>
     </div>
     <div id="status">Lade Tasks…</div>
     <div id="list"></div>
@@ -127,6 +151,37 @@
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+
+  const newTaskOverlay = document.getElementById('newTaskOverlay');
+  document.getElementById('newTaskBtn').onclick = () => {
+    newTaskOverlay.style.display = 'flex';
+    document.getElementById('nt-status').textContent = '';
+    document.getElementById('nt-app').value = 'db_admin';
+    document.getElementById('nt-title').value = '';
+    document.getElementById('nt-note').value = '';
+  };
+  document.getElementById('nt-cancel').onclick = () => { newTaskOverlay.style.display = 'none'; };
+  document.getElementById('nt-save').onclick = async () => {
+    const sourceApp = document.getElementById('nt-app').value.trim();
+    const title = document.getElementById('nt-title').value.trim();
+    const note = document.getElementById('nt-note').value.trim();
+    const priority = document.getElementById('nt-prio').value;
+    const st = document.getElementById('nt-status');
+    if (!sourceApp || !title) { st.textContent = 'App und Titel sind Pflicht.'; return; }
+    st.textContent = 'Speichere…';
+    try {
+      const res = await fetch(`${API_BASE}/tasks`, {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ sourceApp, sourceUrl: window.location.href, title, note, priority })
+      });
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      st.textContent = 'Gespeichert ✓';
+      setTimeout(() => { newTaskOverlay.style.display = 'none'; loadTasks(); }, 500);
+    } catch(e) {
+      st.textContent = 'Fehler: ' + e.message;
+    }
+  };
 
   document.getElementById('refreshBtn').onclick = loadTasks;
   filterStatus.onchange = loadTasks;
