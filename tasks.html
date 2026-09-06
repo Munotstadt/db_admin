@@ -106,7 +106,8 @@
       render(tasks);
       statusEl.textContent = `${tasks.length} Task(s)`;
     } catch(e) {
-      statusEl.textContent = 'Fehler beim Laden: ' + e.message + ' (Login via Cloudflare Access nötig?)';
+      statusEl.innerHTML = 'Nicht eingeloggt oder Verbindung fehlgeschlagen. ' +
+        '<a href="' + API_BASE + '/tasks" target="_blank" rel="noopener">Hier einloggen</a> und danach ↻ Aktualisieren klicken.';
     }
   }
 
@@ -179,7 +180,8 @@
       st.textContent = 'Gespeichert ✓';
       setTimeout(() => { newTaskOverlay.style.display = 'none'; loadTasks(); }, 500);
     } catch(e) {
-      st.textContent = 'Fehler: ' + e.message;
+      st.innerHTML = 'Nicht eingeloggt oder Verbindung fehlgeschlagen. ' +
+        '<a href="' + API_BASE + '/tasks" target="_blank" rel="noopener">Hier einloggen</a> und danach nochmal Speichern klicken.';
     }
   };
 
