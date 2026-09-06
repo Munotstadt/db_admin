@@ -15,14 +15,15 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    #imp-btn{position:fixed;bottom:20px;z-index:99998;
-      background:#E30613;color:#fff;border:none;border-radius:30px;
-      padding:.7rem 1.1rem;font-family:Inter,sans-serif;font-size:.85rem;
-      box-shadow:0 2px 10px rgba(0,0,0,.2);cursor:pointer;display:flex;
-      align-items:center;gap:.4rem;}
-    #imp-btn.right{right:20px;}
-    #imp-btn.left{left:20px;}
-    #imp-btn:hover{background:#c00510;}
+    #imp-btn{position:fixed;bottom:16px;z-index:99998;
+      background:#fff;color:#666;border:1px solid #ddd;border-radius:50%;
+      width:38px;height:38px;font-size:1rem;line-height:1;
+      box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:pointer;display:flex;
+      align-items:center;justify-content:center;padding:0;opacity:.55;
+      transition:opacity .15s, box-shadow .15s;}
+    #imp-btn.right{right:16px;}
+    #imp-btn.left{left:16px;}
+    #imp-btn:hover{opacity:1;box-shadow:0 2px 8px rgba(0,0,0,.25);}
     #imp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99999;
       display:flex;align-items:center;justify-content:center;}
     #imp-modal{background:#fff;border-radius:10px;padding:1.4rem;width:min(420px,90vw);
@@ -43,7 +44,8 @@
   const btn = document.createElement('button');
   btn.id = 'imp-btn';
   btn.className = position === 'left' ? 'left' : 'right';
-  btn.innerHTML = '✎ Improvements';
+  btn.innerHTML = '✎';
+  btn.title = 'Improvement-Task erfassen';
   document.body.appendChild(btn);
 
   function openModal() {
