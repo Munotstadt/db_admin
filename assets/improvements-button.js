@@ -95,7 +95,9 @@
         statusEl.textContent = 'Gespeichert ✓';
         setTimeout(() => overlay.remove(), 700);
       } catch (e) {
-        statusEl.textContent = 'Fehler: ' + e.message + ' (evtl. Google-Login via Cloudflare Access nötig)';
+        statusEl.innerHTML = 'Nicht eingeloggt oder Verbindung fehlgeschlagen. ' +
+          '<a href="' + API_BASE + '/tasks" target="_blank" rel="noopener">Hier einloggen</a> ' +
+          'und danach nochmal auf Speichern klicken.';
       }
     };
   }
