@@ -11,7 +11,7 @@
   const API_BASE = "https://db-admin-tasks.ph-gnaedinger.workers.dev";
   const scriptTag = document.currentScript;
   const appName = (scriptTag && scriptTag.dataset.app) || document.title || "unknown-app";
-  const position = (scriptTag && scriptTag.dataset.position) || "right"; // "left" oder "right"
+  const position = (scriptTag && scriptTag.dataset.position) || "left"; // "left" oder "right"
 
   const style = document.createElement('style');
   style.textContent = `
