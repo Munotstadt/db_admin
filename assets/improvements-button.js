@@ -35,7 +35,7 @@
     #imp-modal textarea{min-height:80px;resize:vertical;}
     #imp-modal .imp-actions{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1rem;}
     #imp-modal button{padding:.5rem 1rem;border-radius:6px;border:1px solid #ddd;
-      background:#fff;cursor:pointer;font-family:inherit;}
+      background:#fff;color:#333;cursor:pointer;font-family:inherit;font-weight:normal;}
     #imp-modal .imp-save{background:#E30613;color:#fff;border-color:#E30613;}
     #imp-status{font-size:.8rem;margin-top:.5rem;color:#555;}
   `;
