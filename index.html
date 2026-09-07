@@ -8,71 +8,41 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --red:#E30613;
-    --red-dim:#f4c9cc;
-    --ink:#14181c;
-    --ink-soft:#4b5560;
-    --paper:#ffffff;
-    --paper-alt:#ffffff;
-    --hover:#f7f7f8;
-    --line:#dde1e4;
-    --line-soft:#eceef0;
-    --green:#0d7a3f;
-    --green-bg:#e7f4ec;
-    --red-bg:#fdeceb;
-    --radius:4px;
+    --red:#E30613; --bg:#f7f7f8; --card:#fff; --border:#e5e5e8;
+    --text:#1a1a1a; --muted:#6b6b70;
+    --green:#1e7a34; --green-bg:#e5f6e8;
+    --radius:10px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
-  body{
-    background:#ffffff;
-    color:var(--ink);
-    font-family:'Inter',sans-serif;
-    font-size:14px;
-    line-height:1.45;
-    -webkit-font-smoothing:antialiased;
-  }
-  h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;margin:0;font-weight:600;letter-spacing:-0.01em;}
+  body{background:var(--bg); color:var(--text); font-family:Inter,sans-serif; font-size:14px; line-height:1.45;}
+  h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;margin:0;font-weight:600;}
   .mono{font-family:'IBM Plex Mono',monospace;}
   a{color:inherit;}
 
   /* ---------- Top bar ---------- */
   header.topbar{
-    background:#fff;
-    color:var(--ink);
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:18px 20px 14px;
-    position:sticky; top:0; z-index:50;
-    border-bottom:2px solid var(--red);
+    display:flex; align-items:center; justify-content:space-between; gap:.6rem;
+    padding:1rem 1.5rem; background:#fff; border-bottom:1px solid var(--border);
   }
-  .brand{display:flex; align-items:center; gap:10px;}
-  .brand h1{font-size:20px; letter-spacing:0.02em; color:var(--ink); text-transform:uppercase; font-weight:700;}
-  .brand .sub{font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); letter-spacing:0.08em; text-transform:uppercase; margin-top:2px;}
+  .brand{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.1rem; color:var(--text);}
+  .brand span{color:var(--red);}
+  .sub{font-family:'IBM Plex Mono',monospace; font-size:.7rem; color:var(--muted); margin-top:2px; font-weight:400;}
 
-  nav.tabs{
-    display:flex; gap:4px; overflow-x:auto; flex-wrap:wrap;
-    background:#fff;
-    padding:10px 20px;
-    border-bottom:1px solid var(--line);
+  nav.tabs{display:flex; gap:.5rem; overflow-x:auto; padding:0 1.5rem; background:#fff; border-bottom:1px solid var(--border);}
+  nav.tabs button, nav.tabs a{
+    padding:.8rem 1rem; text-decoration:none; color:var(--muted); font-size:.9rem;
+    border:none; border-bottom:2px solid transparent; background:none; cursor:pointer;
+    font-family:Inter,sans-serif; white-space:nowrap;
   }
-  nav.tabs button{
-    background:none; color:var(--ink-soft);
-    font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:500;
-    padding:6px 10px; cursor:pointer; white-space:nowrap;
-    border:1px solid transparent; border-radius:3px;
-    transition:color .15s, border-color .15s, background .15s;
-  }
-  nav.tabs button:hover{color:var(--ink); border-color:var(--line);}
-  nav.tabs button.active{color:var(--ink); font-weight:600; border-color:var(--red); background:rgba(227,6,19,0.06);}
+  nav.tabs button.active, nav.tabs a.active{color:var(--text); border-color:var(--red); font-weight:500;}
 
-  main{max-width:1240px; margin:0 auto; padding:22px 20px 60px;}
+  main{max-width:1100px; margin:0 auto; padding:1.5rem;}
   .view{display:none;}
   .view.active{display:block;}
 
   /* ---------- Cards / grid ---------- */
-  .grid{display:grid; gap:14px;}
+  .grid{display:grid; gap:.7rem;}
   .grid.cols-5{grid-template-columns:repeat(5,1fr);}
   .grid.cols-4{grid-template-columns:repeat(4,1fr);}
   .grid.cols-3{grid-template-columns:repeat(3,1fr);}
@@ -81,111 +51,93 @@
   @media(max-width:900px){.grid.cols-4{grid-template-columns:repeat(2,1fr);} .grid.cols-3{grid-template-columns:repeat(2,1fr);}}
   @media(max-width:600px){.grid.cols-5,.grid.cols-4,.grid.cols-3,.grid.cols-2{grid-template-columns:1fr;}}
 
-  .card{
-    background:transparent;
-    border:none;
-    border-radius:0;
-    padding:0;
-  }
-  .card.kpi{border-bottom:1px solid var(--line); padding-bottom:14px;}
-  .card.kpi .label{font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-soft); margin-bottom:8px; font-family:'IBM Plex Mono',monospace;}
-  .card.kpi .value{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600;}
-  .card.kpi .delta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; margin-top:6px; color:var(--ink-soft);}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.2rem;}
+  .card.kpi{padding:.8rem 1rem;}
+  .card.kpi .label{font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:.4rem; font-family:'IBM Plex Mono',monospace;}
+  .card.kpi .value{font-family:'Space Grotesk',sans-serif; font-size:1.3rem; font-weight:600;}
+  .card.kpi .delta{font-family:'IBM Plex Mono',monospace; font-size:.72rem; margin-top:.35rem; color:var(--muted);}
   .delta.pos{color:var(--green);}
   .delta.neg{color:var(--red);}
 
-  .progress{margin-top:7px; height:4px; border-radius:2px; background:var(--line-soft); overflow:hidden;}
+  .progress{margin-top:.5rem; height:4px; border-radius:2px; background:var(--border); overflow:hidden;}
   .progress-fill{height:100%; background:var(--red); border-radius:2px;}
 
-  .section-title{
-    display:flex; align-items:baseline; justify-content:space-between;
-    margin:28px 0 12px; flex-wrap:wrap; gap:6px;
-  }
-  .section-title h2{font-size:18px;}
-  .section-title .hint{font-size:12px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
+  .section-title{display:flex; align-items:baseline; justify-content:space-between; margin:1.6rem 0 .7rem; flex-wrap:wrap; gap:.4rem;}
+  .section-title h2{font-size:1.05rem;}
+  .section-title .hint{font-size:.75rem; color:var(--muted); font-family:'IBM Plex Mono',monospace;}
   .section-title:first-child{margin-top:0;}
 
   /* ---------- Detail card (chart container) ---------- */
-  .chart-card{
-    border:1px solid var(--line); border-radius:var(--radius);
-    padding:16px 18px 10px; background:var(--paper);
-  }
-  .chart-card .card-header{
-    display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px;
-    margin-bottom:12px;
-  }
-  .chart-card .card-title{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;}
-  .chart-card .card-updated{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft);}
+  .chart-card{border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.2rem .6rem; background:var(--card);}
+  .chart-card .card-header{display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:.4rem; margin-bottom:.8rem;}
+  .chart-card .card-title{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:.95rem;}
+  .chart-card .card-updated{font-family:'IBM Plex Mono',monospace; font-size:.7rem; color:var(--muted);}
 
-  .chart-block{margin-top:14px; padding-top:14px; border-top:1px solid var(--line-soft);}
-  .chart-block:first-of-type{border-top:none; margin-top:6px; padding-top:0;}
-  .chart-title{font-size:11px; color:var(--ink-soft); margin-bottom:6px; font-family:'IBM Plex Mono',monospace;}
+  .chart-block{margin-top:.9rem; padding-top:.9rem; border-top:1px solid var(--border);}
+  .chart-block:first-of-type{border-top:none; margin-top:.4rem; padding-top:0;}
+  .chart-title{font-size:.7rem; color:var(--muted); margin-bottom:.4rem; font-family:'IBM Plex Mono',monospace;}
   svg{display:block; width:100%; height:auto; touch-action:pan-y;}
   .line{fill:none; stroke:var(--red); stroke-width:2;}
   .bar{fill:#d7dade;}
   .dot{fill:var(--red);}
   .dot-hit{fill:transparent;}
-  .axis-label{font-family:'IBM Plex Mono',monospace; font-size:9px; fill:var(--ink-soft);}
-  .grid-line{stroke:var(--line); stroke-width:1;}
-  .threshold-line{stroke:var(--ink-soft); stroke-width:1;}
+  .axis-label{font-family:'IBM Plex Mono',monospace; font-size:9px; fill:var(--muted);}
+  .grid-line{stroke:var(--border); stroke-width:1;}
+  .threshold-line{stroke:var(--muted); stroke-width:1;}
 
   #tooltip{
-    position:fixed; background:var(--ink); color:#fff; border:1px solid var(--red);
-    border-radius:var(--radius); padding:6px 10px; font-family:'IBM Plex Mono',monospace;
-    font-size:11px; pointer-events:none; display:none; z-index:100; white-space:nowrap;
+    position:fixed; background:var(--text); color:#fff; border:1px solid var(--red);
+    border-radius:6px; padding:.4rem .6rem; font-family:'IBM Plex Mono',monospace;
+    font-size:.7rem; pointer-events:none; display:none; z-index:100; white-space:nowrap;
   }
 
   .empty-state{
-    text-align:center; padding:50px 20px; color:var(--ink-soft);
-    border:1px dashed var(--line); border-radius:var(--radius); background:var(--paper);
-    font-family:'IBM Plex Mono',monospace; font-size:13px;
+    text-align:center; padding:3rem 1.2rem; color:var(--muted);
+    border:1px dashed var(--border); border-radius:var(--radius); background:var(--card);
+    font-family:'IBM Plex Mono',monospace; font-size:.85rem;
   }
 
   /* ---------- Controls ---------- */
   button.btn{
-    font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:13px;
-    background:var(--ink); color:#fff; border:none; border-radius:var(--radius);
-    padding:8px 14px; cursor:pointer;
+    font-family:Inter,sans-serif; font-weight:500; font-size:.85rem;
+    background:var(--red); color:#fff; border:1px solid var(--red); border-radius:6px;
+    padding:.5rem 1rem; cursor:pointer;
   }
-  button.btn:hover{background:#000;}
-  button.btn.ghost{background:none; color:var(--ink); border:1px solid var(--line);}
-  button.btn.ghost:hover{border-color:var(--ink);}
+  button.btn:hover{opacity:.9;}
+  button.btn.ghost{background:#fff; color:var(--text); border:1px solid var(--border);}
+  button.btn.ghost:hover{border-color:var(--red); color:var(--red);}
 
   select{
-    font-family:'IBM Plex Mono',monospace; font-size:13px;
-    border:1px solid var(--line); border-radius:var(--radius);
-    padding:8px 10px; background:#fff; color:var(--ink);
-    width:100%; max-width:360px; margin-bottom:14px;
-    -webkit-appearance:none; appearance:none;
+    font-family:inherit; font-size:.85rem;
+    border:1px solid var(--border); border-radius:6px;
+    padding:.5rem .7rem; background:#fff; color:var(--text);
+    width:100%; max-width:360px; margin-bottom:.9rem;
   }
   select:focus{outline:2px solid var(--red); outline-offset:-1px;}
 
-  footer.foot{
-    text-align:center; padding:24px; color:var(--ink-soft); font-size:11.5px; font-family:'IBM Plex Mono',monospace;
-  }
+  footer.foot{text-align:center; padding:1.5rem; color:var(--muted); font-size:.75rem; font-family:'IBM Plex Mono',monospace;}
   ::-webkit-scrollbar{height:8px; width:8px;}
-  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+  ::-webkit-scrollbar-thumb{background:var(--border); border-radius:4px;}
 </style>
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand">
-    <div>
-      <h1>DB Admin</h1>
-      <div class="sub">Munotstadt · Resource Monitoring</div>
-    </div>
+  <div>
+    <h1 class="brand">DB <span>Admin</span></h1>
+    <div class="sub">Munotstadt · Resource Monitoring</div>
   </div>
-  <div style="display:flex; align-items:center; gap:16px;">
-    <div class="sub mono" id="header-status" style="text-align:right; color:var(--ink-soft); font-size:11px;">lädt …</div>
-    <button id="refreshBtn" class="btn ghost">Aktualisieren</button>
+  <div style="display:flex; align-items:center; gap:1rem;">
+    <div class="mono" id="header-status" style="text-align:right; color:var(--muted); font-size:.75rem;">lädt …</div>
+    <button id="refreshBtn" class="btn ghost">↻ Aktualisieren</button>
   </div>
 </header>
 
 <nav class="tabs">
+  <button data-view="cloudflare">Cloudflare</button>
   <button data-view="turso" class="active">Turso</button>
   <button data-view="neon">Neon</button>
-  <button data-view="cloudflare">Cloudflare</button>
+  <a href="tasks.html">Tasks</a>
 </nav>
 
 <main>
@@ -899,7 +851,10 @@ document.getElementById('refreshBtn').addEventListener('click', () => {
   else loadData();
 });
 
+const initialView = window.location.hash.replace('#', '');
+if (['turso', 'neon', 'cloudflare'].includes(initialView)) switchView(initialView);
+
 loadData();
-</script>  <script src="assets/improvements-button.js" data-app="db_admin"></script>
+</script>
 </body>
 </html>

@@ -12,9 +12,10 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,sans-serif;}
-  .topbar{display:flex;align-items:center;gap:.6rem;padding:1rem 1.5rem;background:#fff;border-bottom:1px solid var(--border);}
-  .topbar .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.1rem;}
-  .topbar .brand span{color:var(--red);}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:1rem 1.5rem;background:#fff;border-bottom:1px solid var(--border);}
+  .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.1rem;color:var(--text);}
+  .brand span{color:var(--red);}
+  .sub{font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--muted);margin-top:2px;}
   nav.tabs{display:flex;gap:.5rem;padding:0 1.5rem;background:#fff;border-bottom:1px solid var(--border);}
   nav.tabs a{padding:.8rem 1rem;text-decoration:none;color:var(--muted);font-size:.9rem;border-bottom:2px solid transparent;}
   nav.tabs a.active{color:var(--text);border-color:var(--red);font-weight:500;}
@@ -38,12 +39,15 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">DB <span>Admin</span></div>
+    <div>
+      <h1 class="brand">DB <span>Admin</span></h1>
+      <div class="sub">Munotstadt · Resource Monitoring</div>
+    </div>
   </div>
   <nav class="tabs">
-    <a href="index.html">Neon</a>
-    <a href="index.html#turso">Turso</a>
     <a href="index.html#cloudflare">Cloudflare</a>
+    <a href="index.html#turso">Turso</a>
+    <a href="index.html#neon">Neon</a>
     <a href="tasks.html" class="active">Tasks</a>
   </nav>
   <main>
@@ -59,9 +63,9 @@
       <button id="newTaskBtn" style="padding:.5rem 1rem;border-radius:6px;border:1px solid var(--red);background:var(--red);color:#fff;cursor:pointer;">+ Neuer Task</button>
     </div>
 
-    <div id="taskOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center;">
+    <div id="newTaskOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center;">
       <div style="background:#fff;border-radius:10px;padding:1.4rem;width:min(420px,90vw);">
-        <h3 id="nt-heading" style="margin:0 0 .8rem;font-family:'Space Grotesk',sans-serif;">Neuer Task</h3>
+        <h3 style="margin:0 0 .8rem;font-family:'Space Grotesk',sans-serif;">Neuer Task</h3>
         <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">App/Tool</label>
         <input id="nt-app" placeholder="z.B. db_admin" style="width:100%;padding:.5rem;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;">
         <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">Titel</label>
@@ -106,28 +110,8 @@
       render(tasks);
       statusEl.textContent = `${tasks.length} Task(s)`;
     } catch(e) {
-      statusEl.innerHTML = 'Nicht eingeloggt oder Verbindung fehlgeschlagen. ' +
-        '<a href="' + API_BASE + '/tasks" target="_blank" rel="noopener">Hier einloggen</a> und danach ↻ Aktualisieren klicken.';
+      statusEl.textContent = 'Fehler beim Laden: ' + e.message + ' (Login via Cloudflare Access nötig?)';
     }
-  }
-
-  function pageFromUrl(url){
-    if (!url) return null;
-    try {
-      const u = new URL(url);
-      let p = u.pathname.split('/').filter(Boolean).pop() || 'index.html';
-      return p;
-    } catch { return null; }
-  }
-
-  function formatLocal(sqlDateTime){
-    // D1/SQLite liefert "YYYY-MM-DD HH:MM:SS" in UTC ohne Zeitzone-Suffix.
-    // Explizit als UTC parsen, dann in der lokalen Zeitzone des Browsers anzeigen.
-    if (!sqlDateTime) return '';
-    const iso = sqlDateTime.replace(' ', 'T') + 'Z';
-    const d = new Date(iso);
-    if (isNaN(d)) return sqlDateTime;
-    return d.toLocaleString('de-CH');
   }
 
   function render(tasks){
@@ -136,19 +120,17 @@
     for (const t of tasks){
       const div = document.createElement('div');
       div.className = 'card';
-      const page = pageFromUrl(t.SourceUrl);
       div.innerHTML = `
         <div class="row1">
           <h3>${escapeHtml(t.Title)}</h3>
           <span class="badge ${t.Status}">${t.Status}</span>
         </div>
-        <div class="meta">${escapeHtml(t.SourceApp)}${page ? ' · ' + escapeHtml(page) : ''} · ${formatLocal(t.CreatedAt)}${t.SourceUrl ? ' · <a href="'+t.SourceUrl+'" target="_blank">Quelle</a>' : ''}</div>
+        <div class="meta">${escapeHtml(t.SourceApp)} · ${new Date(t.CreatedAt).toLocaleString('de-CH')}${t.SourceUrl ? ' · <a href="'+t.SourceUrl+'" target="_blank">Quelle</a>' : ''}</div>
         ${t.Note ? `<p class="note">${escapeHtml(t.Note)}</p>` : ''}
         <div class="actions">
           ${t.Status !== 'in_progress' ? `<button onclick="setStatus(${t.TaskID},'in_progress')">In Arbeit</button>` : ''}
           ${t.Status !== 'done' ? `<button onclick="setStatus(${t.TaskID},'done')">Erledigt</button>` : ''}
           ${t.Status !== 'open' ? `<button onclick="setStatus(${t.TaskID},'open')">Wieder öffnen</button>` : ''}
-          <button onclick='openEdit(${JSON.stringify(t).replace(/'/g, "&#39;")})'>Bearbeiten</button>
           <button onclick="deleteTask(${t.TaskID})">Löschen</button>
         </div>`;
       listEl.appendChild(div);
@@ -174,65 +156,34 @@
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
-  const taskOverlay = document.getElementById('taskOverlay');
-  const ntHeading = document.getElementById('nt-heading');
-  let editingId = null; // null = neuer Task, sonst TaskID des zu bearbeitenden Tasks
-
+  const newTaskOverlay = document.getElementById('newTaskOverlay');
   document.getElementById('newTaskBtn').onclick = () => {
-    editingId = null;
-    ntHeading.textContent = 'Neuer Task';
-    taskOverlay.style.display = 'flex';
+    newTaskOverlay.style.display = 'flex';
     document.getElementById('nt-status').textContent = '';
     document.getElementById('nt-app').value = 'db_admin';
-    document.getElementById('nt-app').disabled = false;
     document.getElementById('nt-title').value = '';
     document.getElementById('nt-note').value = '';
-    document.getElementById('nt-prio').value = 'normal';
   };
-
-  window.openEdit = function(t){
-    editingId = t.TaskID;
-    ntHeading.textContent = 'Task bearbeiten';
-    taskOverlay.style.display = 'flex';
-    document.getElementById('nt-status').textContent = '';
-    document.getElementById('nt-app').value = t.SourceApp;
-    document.getElementById('nt-app').disabled = true; // App/Quelle nicht nachträglich änderbar
-    document.getElementById('nt-title').value = t.Title;
-    document.getElementById('nt-note').value = t.Note || '';
-    document.getElementById('nt-prio').value = t.Priority || 'normal';
-  };
-
-  document.getElementById('nt-cancel').onclick = () => { taskOverlay.style.display = 'none'; };
+  document.getElementById('nt-cancel').onclick = () => { newTaskOverlay.style.display = 'none'; };
   document.getElementById('nt-save').onclick = async () => {
+    const sourceApp = document.getElementById('nt-app').value.trim();
     const title = document.getElementById('nt-title').value.trim();
     const note = document.getElementById('nt-note').value.trim();
     const priority = document.getElementById('nt-prio').value;
     const st = document.getElementById('nt-status');
-    if (!title) { st.textContent = 'Titel ist Pflicht.'; return; }
+    if (!sourceApp || !title) { st.textContent = 'App und Titel sind Pflicht.'; return; }
     st.textContent = 'Speichere…';
     try {
-      let res;
-      if (editingId) {
-        res = await fetch(`${API_BASE}/tasks/${editingId}`, {
-          method: 'PATCH', credentials: 'include',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ title, note, priority })
-        });
-      } else {
-        const sourceApp = document.getElementById('nt-app').value.trim();
-        if (!sourceApp) { st.textContent = 'App ist Pflicht.'; return; }
-        res = await fetch(`${API_BASE}/tasks`, {
-          method: 'POST', credentials: 'include',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ sourceApp, sourceUrl: window.location.href, title, note, priority })
-        });
-      }
+      const res = await fetch(`${API_BASE}/tasks`, {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ sourceApp, sourceUrl: window.location.href, title, note, priority })
+      });
       if (!res.ok) throw new Error('HTTP '+res.status);
       st.textContent = 'Gespeichert ✓';
-      setTimeout(() => { taskOverlay.style.display = 'none'; loadTasks(); }, 500);
+      setTimeout(() => { newTaskOverlay.style.display = 'none'; loadTasks(); }, 500);
     } catch(e) {
-      st.innerHTML = 'Nicht eingeloggt oder Verbindung fehlgeschlagen. ' +
-        '<a href="' + API_BASE + '/tasks" target="_blank" rel="noopener">Hier einloggen</a> und danach nochmal Speichern klicken.';
+      st.textContent = 'Fehler: ' + e.message;
     }
   };
 
@@ -242,6 +193,5 @@
 
   loadTasks();
 </script>
-  <script src="assets/improvements-button.js" data-app="db_admin"></script>
 </body>
 </html>
