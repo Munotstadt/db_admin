@@ -151,26 +151,21 @@ export default {
     return env.ASSETS.fetch(request);
   },
 
-  // Cron Triggers (siehe [triggers] crons in wrangler.toml). Jede Zeit-Angabe
-  // ruft nur den zugehörigen Collector auf, damit Fehler in einem Collector
-  // die anderen nicht blockieren.
+  // Cron Trigger (siehe [triggers] crons in wrangler.toml): läuft 1x täglich
+  // um 01:00 UTC und ruft alle drei Collectoren nacheinander auf. Jeder läuft
+  // in seinem eigenen try/catch, damit ein Fehler die anderen nicht blockiert.
   async scheduled(event, env, ctx) {
-    const cron = event.cron;
-    try {
-      if (cron === "0 3 * * *") {
-        const result = await collectTurso(env);
-        console.log("Turso Collector:", JSON.stringify(result));
-      } else if (cron === "5 3 * * *") {
-        const result = await collectNeon(env);
-        console.log("Neon Collector:", JSON.stringify(result));
-      } else if (cron === "10 3 * * *") {
-        const result = await collectCloudflare(env);
-        console.log("Cloudflare Collector:", JSON.stringify(result));
-      } else {
-        console.log("Unbekannter Cron-Trigger:", cron);
+    for (const [name, fn] of [
+      ["Turso", collectTurso],
+      ["Neon", collectNeon],
+      ["Cloudflare", collectCloudflare],
+    ]) {
+      try {
+        const result = await fn(env);
+        console.log(`${name} Collector:`, JSON.stringify(result));
+      } catch (err) {
+        console.error(`${name} Collector-Fehler:`, err.message);
       }
-    } catch (err) {
-      console.error(`Collector-Fehler (${cron}):`, err.message);
     }
   },
 };
