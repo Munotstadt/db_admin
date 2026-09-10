@@ -8,7 +8,7 @@
  * das einen neuen Task im Cloudflare-D1-Task-Log anlegt (via Worker-API).
  */
 (function () {
-  const API_BASE = "https://db-admin-tasks.ph-gnaedinger.workers.dev";
+  const API_BASE = "https://admin.munot.app/api";
   const scriptTag = document.currentScript;
   const appName = (scriptTag && scriptTag.dataset.app) || document.title || "unknown-app";
   const position = (scriptTag && scriptTag.dataset.position) || "left"; // "left" oder "right"
@@ -35,7 +35,7 @@
     #imp-modal textarea{min-height:80px;resize:vertical;}
     #imp-modal .imp-actions{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1rem;}
     #imp-modal button{padding:.5rem 1rem;border-radius:6px;border:1px solid #ddd;
-      background:#fff;color:#333;cursor:pointer;font-family:inherit;font-weight:normal;}
+      background:#fff;cursor:pointer;font-family:inherit;}
     #imp-modal .imp-save{background:#E30613;color:#fff;border-color:#E30613;}
     #imp-status{font-size:.8rem;margin-top:.5rem;color:#555;}
   `;
