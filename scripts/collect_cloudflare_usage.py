@@ -27,14 +27,12 @@ Benötigte Umgebungsvariablen (als GitHub Secret zu setzen):
   CF_ZONE_ID     -> (optional) Zone-ID einer Domain, falls CDN/Zone-Requests
                      mit erfasst werden sollen. Wenn nicht gesetzt, werden
                      ZoneRequests/ZoneBandwidthBytes als 0 geschrieben.
+  COLLECTOR_KEY  -> Shared Secret, muss mit der COLLECTOR_KEY Pages-Env-Variable
+                     im db-admin Cloudflare-Pages-Projekt übereinstimmen
 
-CSV-Spalten (Datumsformat: DD.MM.YYYY), Werte sind Tagesdeltas für den
-VORTAG, ausser den mit "(Snapshot)" markierten Storage-Grössen:
-  Datum;WorkersRequests;WorkersErrors;
-  KVReads;KVWrites;KVStorageBytes;
-  D1ReadQueries;D1WriteQueries;D1RowsRead;D1RowsWritten;D1StorageBytes;
-  R2ClassAOps;R2ClassBOps;R2StorageBytes;
-  ZoneRequests;ZoneBandwidthBytes
+Werte werden via admin.munot.app/api/usage/cloudflare in die D1-Tabelle
+cloudflare_usage geschrieben (Tagesdeltas für den VORTAG, ausser den
+Storage-Grössen, die Snapshots sind).
 
 Hinweis: Die GraphQL-Datasets (workersInvocationsAdaptive,
 kvOperationsAdaptiveGroups, kvStorageAdaptiveGroups,
@@ -45,7 +43,6 @@ der jeweilige Block einzeln fehl (siehe try/except je Sektion) und wird als
 0 protokolliert, statt den ganzen Lauf abzubrechen.
 """
 
-import csv
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -53,16 +50,7 @@ from datetime import datetime, timedelta, timezone
 import requests
 
 API_URL = "https://api.cloudflare.com/client/v4/graphql"
-CSV_PATH = os.path.join("data", "cloudflare_usage.csv")
-CSV_HEADER = [
-    "Datum",
-    "WorkersRequests", "WorkersErrors",
-    "KVReads", "KVWrites", "KVStorageBytes",
-    "D1ReadQueries", "D1WriteQueries", "D1RowsRead", "D1RowsWritten", "D1StorageBytes",
-    "R2ClassAOps", "R2ClassBOps", "R2StorageBytes",
-    "ZoneRequests", "ZoneBandwidthBytes",
-]
-CSV_DELIMITER = ";"
+UPLOAD_URL = "https://admin.munot.app/api/usage/cloudflare"
 
 # R2-Operationen: Class A = schreibend/listend, Class B = lesend
 R2_CLASS_A = {
@@ -99,15 +87,15 @@ def graphql(token: str, query: str, variables: dict) -> dict:
     return data["data"]
 
 
-def load_existing_dates(path: str) -> set[str]:
-    if not os.path.exists(path):
-        return set()
-    dates = set()
-    with open(path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
-        for row in reader:
-            dates.add(row["Datum"])
-    return dates
+def upload_row(row: dict, collector_key: str) -> None:
+    resp = requests.post(
+        UPLOAD_URL,
+        headers={"Content-Type": "application/json", "X-Collector-Key": collector_key},
+        json={"rows": [row]},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    print("Upload-Antwort:", resp.json())
 
 
 def fetch_workers(token: str, account_id: str, day: str) -> tuple[int, int]:
@@ -291,18 +279,11 @@ def main() -> None:
     token = get_env("CF_API_TOKEN")
     account_id = get_env("CF_ACCOUNT_ID")
     zone_id = get_env_optional("CF_ZONE_ID")
+    collector_key = get_env("COLLECTOR_KEY")
 
     yesterday = datetime.now(timezone.utc) - timedelta(days=1)
     day = yesterday.strftime("%Y-%m-%d")
     csv_date_str = yesterday.strftime("%d.%m.%Y")
-
-    os.makedirs("data", exist_ok=True)
-    existing_dates = load_existing_dates(CSV_PATH)
-    file_exists = os.path.exists(CSV_PATH)
-
-    if csv_date_str in existing_dates:
-        print(f"Übersprungen (bereits vorhanden): {csv_date_str}")
-        return
 
     workers = safe("Workers", fetch_workers, token, account_id, day) or (0, 0)
     kv = safe("KV", fetch_kv, token, account_id, day) or (0, 0, 0)
@@ -312,20 +293,17 @@ def main() -> None:
     if zone_id:
         zone = safe("Zone/CDN", fetch_zone, token, zone_id, day) or (0, 0)
 
-    row = [
-        csv_date_str,
-        workers[0], workers[1],
-        kv[0], kv[1], kv[2],
-        d1[0], d1[1], d1[2], d1[3], d1[4],
-        r2[0], r2[1], r2[2],
-        zone[0], zone[1],
-    ]
+    row = {
+        "Datum": csv_date_str,
+        "WorkersRequests": workers[0], "WorkersErrors": workers[1],
+        "KVReads": kv[0], "KVWrites": kv[1], "KVStorageBytes": kv[2],
+        "D1ReadQueries": d1[0], "D1WriteQueries": d1[1], "D1RowsRead": d1[2],
+        "D1RowsWritten": d1[3], "D1StorageBytes": d1[4],
+        "R2ClassAOps": r2[0], "R2ClassBOps": r2[1], "R2StorageBytes": r2[2],
+        "ZoneRequests": zone[0], "ZoneBandwidthBytes": zone[1],
+    }
 
-    with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f, delimiter=CSV_DELIMITER)
-        if not file_exists:
-            writer.writerow(CSV_HEADER)
-        writer.writerow(row)
+    upload_row(row, collector_key)
 
     print(
         f"OK: {csv_date_str} -> Workers={workers[0]} Reqs, "
