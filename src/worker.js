@@ -2,6 +2,9 @@
 // Einziger Entry-Point: API-Routen (/api/...) werden hier behandelt,
 // alles andere fällt durch an die Static Assets (env.ASSETS), die aus dem
 // "public/"-Verzeichnis ausgeliefert werden (siehe wrangler.toml).
+// Zusätzlich: scheduled() für die drei Cron-Collectoren (siehe collectors.js).
+
+import { collectTurso, collectNeon, collectCloudflare } from "./collectors.js";
 
 const ALLOWED_ORIGINS = [
   "https://munotstadt.github.io",
@@ -146,5 +149,28 @@ export default {
 
     // Alles andere: Static Assets ausliefern (index.html, tasks.html, assets/...)
     return env.ASSETS.fetch(request);
+  },
+
+  // Cron Triggers (siehe [triggers] crons in wrangler.toml). Jede Zeit-Angabe
+  // ruft nur den zugehörigen Collector auf, damit Fehler in einem Collector
+  // die anderen nicht blockieren.
+  async scheduled(event, env, ctx) {
+    const cron = event.cron;
+    try {
+      if (cron === "0 3 * * *") {
+        const result = await collectTurso(env);
+        console.log("Turso Collector:", JSON.stringify(result));
+      } else if (cron === "5 3 * * *") {
+        const result = await collectNeon(env);
+        console.log("Neon Collector:", JSON.stringify(result));
+      } else if (cron === "10 3 * * *") {
+        const result = await collectCloudflare(env);
+        console.log("Cloudflare Collector:", JSON.stringify(result));
+      } else {
+        console.log("Unbekannter Cron-Trigger:", cron);
+      }
+    } catch (err) {
+      console.error(`Collector-Fehler (${cron}):`, err.message);
+    }
   },
 };
