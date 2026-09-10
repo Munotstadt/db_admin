@@ -97,7 +97,7 @@
         statusEl.textContent = 'Gespeichert ✓';
         setTimeout(() => overlay.remove(), 700);
       } catch (e) {
-        statusEl.innerHTML = 'Nicht eingeloggt oder Verbindung fehlgeschlagen. ' +
+        statusEl.innerHTML = 'Fehler: ' + e.name + ': ' + e.message + '<br>' +
           '<a href="' + API_BASE + '/tasks" target="_blank" rel="noopener">Hier einloggen</a> ' +
           'und danach nochmal auf Speichern klicken.';
       }
