@@ -11,7 +11,12 @@ binding = "DB"
 database_name = "db_admin"
 database_id = "78377bf1-f491-4879-bab0-d47a08605f77"
 
-# COLLECTOR_KEY wird NICHT hier eingetragen (kein Secret im Repo!), sondern im
-# Cloudflare Dashboard: Worker "db-admin" -> Settings -> Variables and Secrets
-# -> COLLECTOR_KEY hinzufügen (Typ: Secret). Denselben Wert danach als GitHub
-# Actions Secret (COLLECTOR_KEY) in Munotstadt/db_admin hinterlegen.
+[triggers]
+crons = ["0 3 * * *", "5 3 * * *", "10 3 * * *"]
+
+# Folgende Secrets im Cloudflare Dashboard setzen (Worker "db-admin" ->
+# Settings -> Variables and Secrets), NICHT hier im Repo:
+#   COLLECTOR_KEY     (für manuelle /api/usage POST-Aufrufe, optional)
+#   TURSO_API_TOKEN, TURSO_ORG_SLUG
+#   NEON_API_KEY, NEON_ORG_ID (optional)
+#   CF_API_TOKEN, CF_ACCOUNT_ID, CF_ZONE_ID (optional)
