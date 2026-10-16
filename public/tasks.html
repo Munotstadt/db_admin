@@ -2,26 +2,29 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<title>DB Admin – Tasks</title>
+<title>Munotstadt DB Admin · Tasks</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --red:#E30613; --bg:#f7f7f8; --card:#fff; --border:#e5e5e8;
+    --red:#E30613; --bg:#fff; --card:#fff; --border:#d8d8d8;
     --text:#1a1a1a; --muted:#6b6b70;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,sans-serif;}
-  .topbar{display:flex;align-items:center;gap:.6rem;padding:1rem 1.5rem;background:#fff;border-bottom:1px solid var(--border);}
-  .topbar .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.1rem;}
-  .topbar .brand span{color:var(--red);}
-  nav.tabs{display:flex;gap:.5rem;padding:0 1.5rem;background:#fff;border-bottom:1px solid var(--border);}
-  nav.tabs a{padding:.8rem 1rem;text-decoration:none;color:var(--muted);font-size:.9rem;border-bottom:2px solid transparent;}
-  nav.tabs a.active{color:var(--text);border-color:var(--red);font-weight:500;}
+  header.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:2px solid #1a1a1a;background:#fff;}
+  header.topbar .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;}
+  header.topbar .brand span{color:var(--red);}
+  header.topbar .nav-right{display:flex;align-items:center;gap:6px;}
+  header.topbar .nav-links{display:flex;gap:2px;margin-right:6px;}
+  header.topbar .nav-link,header.topbar .logout-link{text-decoration:none;color:#1a1a1a;font-size:13px;font-weight:500;padding:7px 12px;border-radius:6px;white-space:nowrap;}
+  header.topbar .logout-link{color:#666;}
+  header.topbar .nav-link:hover,header.topbar .logout-link:hover{background:#f4f4f4;}
+  header.topbar .nav-link.active{background:#1a1a1a;color:#fff;}
   main{padding:1.5rem;max-width:1100px;margin:0 auto;}
   .toolbar{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;}
   .toolbar select,.toolbar input{padding:.5rem .7rem;border:1px solid var(--border);border-radius:6px;font-family:inherit;}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;margin-bottom:.7rem;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem 1.2rem;margin-bottom:.7rem;}
   .card .row1{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;}
   .card h3{margin:0;font-size:1rem;font-family:'Space Grotesk',sans-serif;}
   .meta{font-family:'IBM Plex Mono',monospace;font-size:.75rem;color:var(--muted);}
@@ -37,15 +40,16 @@
 </style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="brand">DB <span>Admin</span></div>
-  </div>
-  <nav class="tabs">
-    <a href="index.html">Neon</a>
-    <a href="index.html#turso">Turso</a>
-    <a href="index.html#cloudflare">Cloudflare</a>
-    <a href="tasks.html" class="active">Tasks</a>
-  </nav>
+  <header class="topbar">
+    <div class="brand">Munotstadt <span>DB Admin</span></div>
+    <div class="nav-right">
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">Cloudflare</a>
+        <a href="tasks.html" class="nav-link active">Tasks</a>
+      </div>
+      <a href="/cdn-cgi/access/logout" class="logout-link">Logout</a>
+    </div>
+  </header>
   <main>
     <div class="toolbar">
       <select id="filterStatus">
