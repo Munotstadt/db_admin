@@ -12,7 +12,9 @@ database_name = "db_admin"
 database_id = "78377bf1-f491-4879-bab0-d47a08605f77"
 
 [triggers]
-crons = ["15 1 * * *"]
+# Ziel: 18:05 und 02:00 Zürich-Zeit. Cron kennt nur UTC -> beide UTC-Varianten (CEST/CET);
+# scheduled() in src/worker.js filtert auf die passende Zürcher Uhrzeit.
+crons = ["5 16,17 * * *", "0 0,1 * * *"]
 
 [observability]
 enabled = true

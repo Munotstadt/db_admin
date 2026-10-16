@@ -8,7 +8,7 @@ Layout und CSS folgen `energy.munot.app` (Topbar, KPI-Kacheln, Cards, Tabs, Tool
 
 - **Worker `db-admin`** (`src/worker.js`) liefert API (`/api/...`) und Static Assets aus `public/`
 - **D1 `db_admin`** (`78377bf1-f491-4879-bab0-d47a08605f77`): Tabellen `cloudflare_usage`, `improvement_tasks`, `collector_runs`
-- **Cron** `15 1 * * *` (UTC) → `scheduled()` → `collectCloudflare()` (`src/collectors.js`)
+- **Cron** 18:05 und 02:00 Zürich-Zeit (ganzjährig, Crons `5 16,17 * * *` und `0 0,1 * * *` in UTC, `scheduled()` filtert auf die Zürcher Uhrzeit) → `scheduled()` → `collectCloudflare()` (`src/collectors.js`)
 - Zugriffsschutz: Cloudflare Access (Google-Login)
 
 ## Collector
@@ -41,7 +41,7 @@ Im Dashboard unter `PLAN` in `public/index.html` gepflegt (Stand Okt 2026). Übe
 | KV Reads / Writes / Storage | 10 Mio / 1 Mio / 1 GB | 0.50 / 5.00 USD je Mio, 0.50 USD / GB |
 | R2 Storage / Class A / Class B | 10 GB / 1 Mio / 10 Mio | 0.015 USD/GB, 4.50 / 0.36 USD je Mio |
 
-Basis: 5 USD / Monat. `BILLING_DAY` (Standard 1) bestimmt den Beginn der Abrechnungsperiode.
+Basis: 5 USD / Monat. `BILLING_DAY` (aktuell 24, Zyklus 24. bis 23.) bestimmt den Beginn der Abrechnungsperiode.
 
 ## Einmalige Aufräumarbeiten
 

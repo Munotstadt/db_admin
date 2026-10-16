@@ -171,9 +171,14 @@ export default {
     return env.ASSETS.fetch(request);
   },
 
-  // Cron Trigger (siehe [triggers] crons in wrangler.toml): 1x täglich 01:15 UTC.
-  // Holt fehlende Tage nach und schreibt das Ergebnis ins collector_runs-Log.
+  // Cron Trigger: Cron läuft nur in UTC. Damit der Lauf ganzjährig um 18:05 und 02:00
+  // Zürich-Zeit stattfindet, feuern die Crons zu beiden UTC-Varianten (Sommer-/Winterzeit);
+  // hier wird nur der zur aktuellen Zürcher Uhrzeit passende Lauf ausgeführt.
   async scheduled(event, env, ctx) {
+    const zurichHour = Number(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Zurich", hour: "2-digit", hourCycle: "h23",
+    }).format(new Date(event.scheduledTime)));
+    if (zurichHour !== 18 && zurichHour !== 2) return;
     ctx.waitUntil((async () => {
       try {
         const result = await collectCloudflare(env);
