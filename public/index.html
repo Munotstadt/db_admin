@@ -264,7 +264,7 @@ async function load(){
     document.getElementById('subline').textContent =
       `${DATA[0].Datum} – ${DATA[DATA.length-1].Datum} · ${DATA.length} Tage · Plan: Workers Paid + R2`;
     document.getElementById('footerInfo').textContent =
-      "Datenquelle: Cloudflare GraphQL Analytics → D1 (db_admin), täglicher Collector 01:15 UTC";
+      "Datenquelle: Cloudflare GraphQL Analytics → D1 (db_admin), Collector täglich 18:05 und 02:00 (Zürich)";
     renderAll();
   } catch(e){
     document.getElementById('status').innerHTML =
@@ -289,7 +289,7 @@ function renderNotice(runs){
   }
   if (stale){
     el.innerHTML = `<div class="notice alert"><b>Daten sind nicht aktuell</b>${lastData ? ` – letzter Tag: ${DATA[DATA.length-1].Datum}` : ''}. ` +
-      `Collector prüfen: Worker <span class="mono">db-admin</span> → Settings → Triggers (Cron <span class="mono">15 1 * * *</span>) und Secrets ` +
+      `Collector prüfen: Worker <span class="mono">db-admin</span> → Settings → Triggers (Crons <span class="mono">5 16,17 * * *</span> und <span class="mono">0 0,1 * * *</span>) und Secrets ` +
       `<span class="mono">CF_API_TOKEN</span>, <span class="mono">CF_ACCOUNT_ID</span>.<br>${runLine}</div>`;
   } else {
     el.innerHTML = `<div class="notice">${runLine}</div>`;
