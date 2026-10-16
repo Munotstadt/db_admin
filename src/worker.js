@@ -2,9 +2,9 @@
 // Einziger Entry-Point: API-Routen (/api/...) werden hier behandelt,
 // alles andere fällt durch an die Static Assets (env.ASSETS), die aus dem
 // "public/"-Verzeichnis ausgeliefert werden (siehe wrangler.toml).
-// Zusätzlich: scheduled() für die drei Cron-Collectoren (siehe collectors.js).
+// Zusätzlich: scheduled() für den täglichen Cloudflare-Usage-Collector (collectors.js).
 
-import { collectTurso, collectNeon, collectCloudflare } from "./collectors.js";
+import { collectCloudflare, logRun, ensureRunsTable, USAGE_COLS } from "./collectors.js";
 
 const ALLOWED_ORIGINS = [
   "https://munotstadt.github.io",
@@ -12,6 +12,7 @@ const ALLOWED_ORIGINS = [
   "https://energy.munot.app",
   "https://splint.munot.app",
   "https://meteo.munot.app",
+  "https://52b.munot.app",
 ];
 
 function corsHeaders(request) {
@@ -34,21 +35,11 @@ function json(data, status, cors) {
 }
 
 const USAGE_TABLES = {
-  turso: {
-    table: "turso_usage",
-    cols: ["Datum", "Datenbank", "RowsRead", "RowsWritten", "BytesSynced", "StorageBytes"],
-  },
-  neon: {
-    table: "neon_usage",
-    cols: ["Datum", "Projekt", "ComputeTimeSeconds", "ActiveTimeSeconds", "WrittenDataBytes", "DataTransferBytes", "StorageBytes"],
-  },
-  cloudflare: {
-    table: "cloudflare_usage",
-    cols: ["Datum", "WorkersRequests", "WorkersErrors", "KVReads", "KVWrites", "KVStorageBytes",
-      "D1ReadQueries", "D1WriteQueries", "D1RowsRead", "D1RowsWritten", "D1StorageBytes",
-      "R2ClassAOps", "R2ClassBOps", "R2StorageBytes", "ZoneRequests", "ZoneBandwidthBytes"],
-  },
+  cloudflare: { table: "cloudflare_usage", cols: USAGE_COLS },
 };
+
+// Datum liegt als DD.MM.YYYY vor -> für korrekte Sortierung nach ISO umbauen
+const ORDER_BY_DATUM = "substr(Datum,7,4) || substr(Datum,4,2) || substr(Datum,1,2)";
 
 async function handleTasksCollection(request, env, cors) {
   if (request.method === "GET") {
@@ -99,7 +90,7 @@ async function handleUsage(request, env, source) {
   if (!cfg) return json({ error: "unbekannte source" }, 404);
 
   if (request.method === "GET") {
-    const { results } = await env.DB.prepare(`SELECT * FROM ${cfg.table} ORDER BY Datum ASC`).all();
+    const { results } = await env.DB.prepare(`SELECT * FROM ${cfg.table} ORDER BY ${ORDER_BY_DATUM} ASC`).all();
     return json(results);
   }
   if (request.method === "POST") {
@@ -121,6 +112,29 @@ async function handleUsage(request, env, source) {
   return json({ error: "method not allowed" }, 405);
 }
 
+async function handleCollectorStatus(env) {
+  await ensureRunsTable(env);
+  const { results } = await env.DB.prepare(
+    "SELECT RunID, RanAt, TriggerType, Status, DaysCollected, Message FROM collector_runs ORDER BY RunID DESC LIMIT 10"
+  ).all();
+  return json({ runs: results });
+}
+
+// Manueller Lauf: curl -X POST -H "X-Collector-Key: <KEY>" https://admin.munot.app/api/collector/run?days=45
+async function handleCollectorRun(request, env) {
+  const key = request.headers.get("X-Collector-Key");
+  if (!env.COLLECTOR_KEY || !key || key !== env.COLLECTOR_KEY) return json({ error: "unauthorized" }, 401);
+  const days = Number(new URL(request.url).searchParams.get("days")) || undefined;
+  try {
+    const result = await collectCloudflare(env, { days });
+    await logRun(env, "manual", "ok", result.saved, result.message);
+    return json({ ok: true, ...result });
+  } catch (err) {
+    await logRun(env, "manual", "error", 0, err.message);
+    return json({ ok: false, error: err.message }, 500);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -139,6 +153,12 @@ export default {
       if (taskMatch) {
         return await handleTaskItem(request, env, cors, taskMatch[1]);
       }
+      if (pathname === "/api/collector/status" && request.method === "GET") {
+        return await handleCollectorStatus(env);
+      }
+      if (pathname === "/api/collector/run" && request.method === "POST") {
+        return await handleCollectorRun(request, env);
+      }
       const usageMatch = pathname.match(/^\/api\/usage\/([a-z]+)$/);
       if (usageMatch) {
         return await handleUsage(request, env, usageMatch[1]);
@@ -151,21 +171,18 @@ export default {
     return env.ASSETS.fetch(request);
   },
 
-  // Cron Trigger (siehe [triggers] crons in wrangler.toml): läuft 1x täglich
-  // um 01:00 UTC und ruft alle drei Collectoren nacheinander auf. Jeder läuft
-  // in seinem eigenen try/catch, damit ein Fehler die anderen nicht blockiert.
+  // Cron Trigger (siehe [triggers] crons in wrangler.toml): 1x täglich 01:15 UTC.
+  // Holt fehlende Tage nach und schreibt das Ergebnis ins collector_runs-Log.
   async scheduled(event, env, ctx) {
-    for (const [name, fn] of [
-      ["Turso", collectTurso],
-      ["Neon", collectNeon],
-      ["Cloudflare", collectCloudflare],
-    ]) {
+    ctx.waitUntil((async () => {
       try {
-        const result = await fn(env);
-        console.log(`${name} Collector:`, JSON.stringify(result));
+        const result = await collectCloudflare(env);
+        console.log("Cloudflare Collector:", JSON.stringify(result));
+        await logRun(env, "cron", result.errors ? "partial" : "ok", result.saved, result.message);
       } catch (err) {
-        console.error(`${name} Collector-Fehler:`, err.message);
+        console.error("Cloudflare Collector-Fehler:", err.message);
+        await logRun(env, "cron", "error", 0, err.message);
       }
-    }
+    })());
   },
 };
