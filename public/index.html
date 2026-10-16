@@ -181,9 +181,9 @@
 const API_USAGE = "/api/usage/cloudflare";
 const API_STATUS = "/api/collector/status";
 
-// Tag im Monat, an dem die Workers-Paid-Abrechnungsperiode beginnt
+// Tag im Monat, an dem die Workers-Paid-Abrechnungsperiode beginnt (Zyklus 24. bis 23.)
 // (= Tag des Abschlusses der Subscription, im Dashboard unter Billing ersichtlich).
-const BILLING_DAY = 1;
+const BILLING_DAY = 24;
 const GB = 1024 ** 3;
 
 // Im Plan enthaltene Kontingente (Workers Paid, R2 Free-Tier innerhalb der R2-Subscription).

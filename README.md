@@ -41,7 +41,7 @@ Im Dashboard unter `PLAN` in `public/index.html` gepflegt (Stand Okt 2026). Übe
 | KV Reads / Writes / Storage | 10 Mio / 1 Mio / 1 GB | 0.50 / 5.00 USD je Mio, 0.50 USD / GB |
 | R2 Storage / Class A / Class B | 10 GB / 1 Mio / 10 Mio | 0.015 USD/GB, 4.50 / 0.36 USD je Mio |
 
-Basis: 5 USD / Monat. `BILLING_DAY` (Standard 1) bestimmt den Beginn der Abrechnungsperiode.
+Basis: 5 USD / Monat. `BILLING_DAY` (aktuell 24, Zyklus 24. bis 23.) bestimmt den Beginn der Abrechnungsperiode.
 
 ## Einmalige Aufräumarbeiten
 
