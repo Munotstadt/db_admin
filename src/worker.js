@@ -5,6 +5,7 @@
 // Zusätzlich: scheduled() für den täglichen Cloudflare-Usage-Collector (collectors.js).
 
 import { collectCloudflare, logRun, ensureRunsTable, USAGE_COLS } from "./collectors.js";
+import { handleRam } from "./ram.js";
 
 const ALLOWED_ORIGINS = [
   "https://munotstadt.github.io",
@@ -152,6 +153,9 @@ export default {
       const taskMatch = pathname.match(/^\/api\/tasks\/(\d+)$/);
       if (taskMatch) {
         return await handleTaskItem(request, env, cors, taskMatch[1]);
+      }
+      if (pathname === "/api/ram" && request.method === "GET") {
+        return await handleRam(url, env);
       }
       if (pathname === "/api/collector/status" && request.method === "GET") {
         return await handleCollectorStatus(env);
