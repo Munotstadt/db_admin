@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Munotstadt DB Admin · NAS RAM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--red:#E30613;--ink:#1a1a1a;--grey-600:#666;--grey-300:#d8d8d8;--grey-100:#f4f4f4;--radius:6px;
+--bg:#fff;--card:#fff;--text:#1a1a1a;--muted:#6b6b70;--line:#d8d8d8;--accent:#1f6feb;--ok:#1f9d55;--warn:#b9770e;--bad:#E30613}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 Inter,sans-serif}
+header.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:2px solid var(--ink)}
+header.topbar .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px}
+header.topbar .brand span{color:var(--red)}
+header.topbar .nav-right{display:flex;align-items:center;gap:6px}
+header.topbar .nav-links{display:flex;gap:2px;margin-right:6px}
+header.topbar .nav-link,header.topbar .logout-link{text-decoration:none;color:var(--ink);font-size:13px;font-weight:500;padding:7px 12px;border-radius:var(--radius);white-space:nowrap}
+header.topbar .logout-link{color:var(--grey-600)}
+header.topbar .nav-link:hover,header.topbar .logout-link:hover{background:var(--grey-100)}
+header.topbar .nav-link.active{background:var(--ink);color:#fff}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 20px 60px}
+.pagehead{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+h1{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:1.4rem;margin:0 0 2px}
+.sub{color:var(--muted);font-size:.85rem}
+.controls{display:flex;gap:6px;flex-wrap:wrap}
+button{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:var(--radius);padding:6px 12px;cursor:pointer;font:inherit;font-size:13px}
+button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.card .l{color:var(--muted);font-size:12px}
+.card .v{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;margin-top:2px}
+.card .n{color:var(--muted);font-size:12px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:16px}
+.panel h2{font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:600;margin:0 0 8px}
+canvas{width:100%;height:240px;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:500;font-size:12px}
+.bar{height:6px;background:var(--grey-100);border-radius:3px;min-width:80px}
+.bar b{display:block;height:100%;background:var(--accent);border-radius:3px}
+.note{padding:12px 16px;border-radius:var(--radius);background:var(--card);border:1px solid var(--line);color:var(--muted);margin-bottom:16px;display:none}
+.note.err{color:var(--bad)}
+.note.warn{color:var(--warn);border-color:var(--warn)}
+.tip{position:fixed;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:6px 8px;font-size:12px;display:none;box-shadow:0 4px 14px rgba(0,0,0,.15);z-index:5}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">Munotstadt <span>DB Admin</span></div>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Cloudflare</a>
+      <a href="ram.html" class="nav-link active">NAS RAM</a>
+      <a href="tasks.html" class="nav-link">Tasks</a>
+    </div>
+    <a href="/cdn-cgi/access/logout" class="logout-link">Logout</a>
+  </div>
+</header>
+<div class="wrap">
+  <div class="pagehead">
+    <div>
+      <h1>NAS RAM Monitor</h1>
+      <div class="sub" id="meta">Lade ...</div>
+    </div>
+    <div class="controls">
+      <button data-r="1">24 h</button>
+      <button data-r="7">7 Tage</button>
+      <button data-r="30">30 Tage</button>
+      <button data-r="0">Alles</button>
+    </div>
+  </div>
+  <div id="stale" class="note warn"></div>
+  <div id="msg" class="note"></div>
+  <div id="content" style="display:none">
+    <div class="cards" id="cards"></div>
+    <div class="panel"><h2>System: belegt und verfügbar (MB)</h2><canvas id="c1"></canvas><div class="legend" id="l1"></div></div>
+    <div class="panel"><h2>Swap (MB)</h2><canvas id="c2"></canvas></div>
+    <div class="panel"><h2>Container: RAM (MB), Top 6</h2><canvas id="c3"></canvas><div class="legend" id="l3"></div></div>
+    <div class="panel"><h2>Container im gewählten Zeitraum</h2><table id="tbl"></table></div>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const COLORS=['#1f6feb','#1f9d55','#b9770e','#E30613','#7c3aed','#0891b2'];
+let RANGE=7;
+try{const s=localStorage.getItem('ramRange');if(s!==null&&['0','1','7','30'].includes(s))RANGE=Number(s)}catch(e){}
+let DATA=null, LOADED=0;
+const fmt=(v,d=0)=>v==null?'–':Number(v).toLocaleString('de-CH',{maximumFractionDigits:d});
+const msg=document.getElementById('msg'), stale=document.getElementById('stale');
+
+async function load(){
+  try{
+    const r=await fetch('/api/ram?days='+RANGE,{cache:'no-store'});
+    const j=await r.json();
+    if(!r.ok) throw new Error(j.error||r.status);
+    DATA=j; LOADED=Date.now(); msg.style.display='none';
+    if(!j.rows.length){ msg.className='note';msg.textContent='Noch keine Daten im gewählten Zeitraum.';msg.style.display='block';stale.style.display='none';document.getElementById('content').style.display='none';return }
+    document.getElementById('content').style.display='block';
+    render();
+  }catch(e){
+    msg.className='note err';msg.textContent='Fehler beim Laden: '+e.message+' (nicht eingeloggt? Seite neu laden)';msg.style.display='block';
+  }
+}
+
+function render(){
+  document.querySelectorAll('[data-r]').forEach(b=>b.classList.toggle('active',+b.dataset.r===RANGE));
+  const {rows,stats,system:s,span}=DATA;
+  document.getElementById('meta').textContent=
+    `${fmt(span.n)} Messungen · ${new Date(span.first).toLocaleString('de-CH')} bis ${new Date(span.last).toLocaleString('de-CH')} · Raster ${DATA.bucket}`;
+  const age=Math.round((Date.now()-new Date(span.last).getTime())/60000);
+  if(age>15){stale.textContent=`Keine neuen Messungen seit ${fmt(age)} Minuten (letzte: ${new Date(span.last).toLocaleString('de-CH')}). Läuft die Aufgabe auf dem NAS?`;stale.style.display='block'}
+  else stale.style.display='none';
+  const cls=(v,w,b,inv)=>v==null?'':(inv?(v<b?'var(--bad)':v<w?'var(--warn)':'var(--ok)'):(v>b?'var(--bad)':v>w?'var(--warn)':'var(--ok)'));
+  const cards=[
+    ['Verfügbar jetzt',fmt(s.last_avail)+' MB','von '+fmt(s.total)+' MB',cls(s.last_avail,1000,500,true)],
+    ['Minimum verfügbar',fmt(s.min_avail)+' MB','im Zeitraum',cls(s.min_avail,1000,500,true)],
+    ['Belegt jetzt',fmt(s.last_used)+' MB',s.total?fmt(s.last_used/s.total*100)+' % von total':'',''],
+    ['Swap max',fmt(s.max_swap)+' MB','jetzt '+fmt(s.last_swap)+' MB',cls(s.max_swap,200,500,false)]
+  ];
+  document.getElementById('cards').innerHTML=cards.map(c=>`<div class="card"><div class="l">${c[0]}</div><div class="v" style="color:${c[3]||'inherit'}">${c[1]}</div><div class="n">${c[2]}</div></div>`).join('');
+
+  const sys=rows.filter(r=>r.source==='system');
+  const pick=(k)=>sys.filter(r=>r[k]!=null).map(r=>({t:new Date(r.ts).getTime(),v:r[k]}));
+  const ser1=[{name:'Belegt (Ø)',color:COLORS[0],pts:pick('used_mb')},{name:'Verfügbar (Min)',color:COLORS[1],pts:pick('avail_mb')}];
+  chart('c1',ser1,{ref:s.total?{v:s.total,label:'Total',color:'#9ca3af'}:null});
+  legend('l1',ser1);
+  chart('c2',[{name:'Swap (Max)',color:COLORS[3],pts:pick('swap_mb')}],{});
+
+  const by={};
+  rows.filter(r=>r.source!=='system'&&r.used_mb!=null).forEach(r=>(by[r.source]=by[r.source]||[]).push({t:new Date(r.ts).getTime(),v:r.used_mb}));
+  const top=stats.slice(0,6).filter(x=>by[x.source]).map((x,i)=>({name:x.source,color:COLORS[i],pts:by[x.source]}));
+  chart('c3',top,{}); legend('l3',top);
+  const mx=Math.max(...stats.map(x=>x.max_mb),1);
+  document.getElementById('tbl').innerHTML='<tr><th>Container</th><th>Ø MB</th><th>Max MB</th><th>Zuletzt MB</th><th style="width:140px">Max</th></tr>'+
+    stats.map(x=>`<tr><td>${x.source}</td><td>${fmt(x.avg_mb,1)}</td><td>${fmt(x.max_mb,1)}</td><td>${fmt(x.last_mb,1)}</td><td><div class="bar"><b style="width:${x.max_mb/mx*100}%"></b></div></td></tr>`).join('');
+}
+function legend(id,ser){document.getElementById(id).innerHTML=ser.map(s=>`<span><i style="background:${s.color}"></i>${s.name}</span>`).join('')}
+
+const charts={};
+function niceMax(v){if(v<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(v))),m=v/p;return(m<=1?1:m<=2?2:m<=5?5:10)*p}
+function chart(id,series,opt){
+  const cv=document.getElementById(id),dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  const css=getComputedStyle(document.documentElement),muted=css.getPropertyValue('--muted').trim(),grid=css.getPropertyValue('--line').trim();
+  const pad={l:48,r:10,t:10,b:22},all=series.flatMap(s=>s.pts);
+  if(!all.length){ctx.fillStyle=muted;ctx.fillText('Keine Daten',pad.l,30);return}
+  const t0=Math.min(...all.map(p=>p.t)),t1=Math.max(...all.map(p=>p.t));
+  let vmax=Math.max(...all.map(p=>p.v));if(opt.ref)vmax=Math.max(vmax,opt.ref.v);vmax=niceMax(vmax);
+  const X=t=>pad.l+(t-t0)/Math.max(1,t1-t0)*(W-pad.l-pad.r),Y=v=>pad.t+(1-v/vmax)*(H-pad.t-pad.b);
+  ctx.font='11px system-ui';ctx.fillStyle=muted;ctx.strokeStyle=grid;ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const v=vmax*i/4,y=Y(v);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.textAlign='right';ctx.fillText(fmt(v),pad.l-6,y+3)}
+  ctx.textAlign='center';
+  for(let i=0;i<=4;i++){const t=t0+(t1-t0)*i/4,d=new Date(t);
+    const lab=(t1-t0)<2*86400000?d.toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'});
+    ctx.fillText(lab,Math.min(Math.max(X(t),pad.l+14),W-pad.r-14),H-6)}
+  if(opt.ref){ctx.strokeStyle=opt.ref.color;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(pad.l,Y(opt.ref.v));ctx.lineTo(W-pad.r,Y(opt.ref.v));ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=opt.ref.color;ctx.textAlign='left';ctx.fillText(opt.ref.label,pad.l+4,Y(opt.ref.v)-4)}
+  series.forEach(s=>{ctx.strokeStyle=s.color;ctx.lineWidth=1.6;ctx.beginPath();s.pts.forEach((p,i)=>i?ctx.lineTo(X(p.t),Y(p.v)):ctx.moveTo(X(p.t),Y(p.v)));ctx.stroke();
+    if(s.pts.length===1){ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(X(s.pts[0].t),Y(s.pts[0].v),3,0,7);ctx.fill()}});
+  charts[id]={series,pad,W,t0,t1};cv.onmousemove=e=>tip(e,id);cv.onmouseleave=()=>document.getElementById('tip').style.display='none';
+}
+function tip(e,id){
+  const c=charts[id];if(!c)return;const r=e.target.getBoundingClientRect(),x=e.clientX-r.left;
+  const t=c.t0+(x-c.pad.l)/(c.W-c.pad.l-c.pad.r)*(c.t1-c.t0);
+  const rows=c.series.map(s=>{let b=null,bd=1e18;for(const p of s.pts){const d=Math.abs(p.t-t);if(d<bd){bd=d;b=p}}return b&&`<div><i style="display:inline-block;width:8px;height:8px;background:${s.color};border-radius:2px;margin-right:5px"></i>${s.name}: <b>${fmt(b.v,1)} MB</b></div>`}).filter(Boolean);
+  const el=document.getElementById('tip');el.innerHTML=`<div style="color:var(--muted)">${new Date(t).toLocaleString('de-CH')}</div>`+rows.join('');
+  el.style.display='block';el.style.left=Math.min(e.clientX+14,innerWidth-190)+'px';el.style.top=(e.clientY+14)+'px';
+}
+document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{RANGE=+b.dataset.r;try{localStorage.setItem('ramRange',RANGE)}catch(e){}load()});
+addEventListener('resize',()=>{if(DATA&&DATA.rows.length)render()});
+// Daten kommen alle 5 Minuten: nur dann neu laden, wenn die Seite sichtbar ist
+setInterval(()=>{if(!document.hidden)load()},300000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-LOADED>300000)load()});
+load();
+</script>
+</body>
+</html>

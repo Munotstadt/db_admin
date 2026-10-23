@@ -52,8 +52,18 @@ Basis: 5 USD / Monat. `BILLING_DAY` (aktuell 24, Zyklus 24. bis 23.) bestimmt de
 
 ```
 public/index.html, tasks.html   Frontend
+public/ram.html                 NAS RAM Monitor (Seite, liest /api/ram)
+src/ram.js                      NAS RAM Monitor: Lese-API /api/ram
 public/assets/…, assets/…       improvements-button.js (public/ = admin.munot.app, assets/ = GitHub Pages, von den Apps eingebunden)
 src/worker.js, collectors.js    API + Cron
 schema_usage.sql                D1-Schema
 wrangler.toml                   Worker-Konfiguration
 ```
+
+## NAS RAM Monitor (`/ram.html`)
+
+Zeigt RAM, Swap und Container-Verbrauch des Synology NAS (DS725+). Hinter Cloudflare Access wie der Rest von admin.munot.app.
+
+- **Lesen:** `GET /api/ram?days=1|7|30|0` im Worker `db-admin` (`src/ram.js`) liest direkt aus D1 `db_admin` (Tabellen `nas_ram_monitor` Rohdaten, `nas_ram_monitor_hourly` Stundenwerte). 24 h aus den Rohdaten, 7 Tage / 30 Tage / Alles aus den Stundenwerten.
+- **Schreiben:** macht weiterhin der separate Worker `nas-ram-monitor` (`POST /api/ingest`, Bearer-Token `INGEST_TOKEN`), den das NAS alle 5 Minuten aufruft. Er liegt bewusst ausserhalb von Cloudflare Access, weil das NAS sich dort nicht per Google anmelden kann.
+- Schwellen: "Verfügbar" unter 1000 MB gelb, unter 500 MB rot; "Swap max" über 200 MB gelb, über 500 MB rot.
