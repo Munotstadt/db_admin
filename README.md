@@ -60,6 +60,13 @@ schema_usage.sql                D1-Schema
 wrangler.toml                   Worker-Konfiguration
 ```
 
+## Task-Log (`/tasks.html`)
+
+- Jeder Task bezieht sich auf **eine App oder eine DB** (`TargetType` = `app`|`db`, `Target` = Name). Beim Erfassen/Bearbeiten wird zuerst App oder DB gewählt, danach der Name aus der passenden Vorschlagsliste (freie Eingabe möglich).
+- Vorschläge: `GET /api/tasks/targets` → bekannte Apps, D1-Datenbanken des Accounts (über `CF_API_TOKEN`) und alle bereits verwendeten Namen.
+- Filter: Status, App/DB (Typ), konkrete App bzw. DB (`GET /api/tasks?status=&targetType=&target=`) und Freitextsuche.
+- Der Improvements-Button sendet keinen Bezug → Task wird automatisch der erfassenden App zugeordnet. Bestehende Tasks wurden ebenso als App-Tasks (`Target = SourceApp`) übernommen.
+
 ## NAS RAM Monitor (`/ram.html`)
 
 Zeigt RAM, Swap und Container-Verbrauch des Synology NAS (DS725+). Hinter Cloudflare Access wie der Rest von admin.munot.app.
