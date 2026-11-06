@@ -31,3 +31,11 @@ CREATE TABLE IF NOT EXISTS collector_runs (
   DaysCollected INTEGER DEFAULT 0,
   Message TEXT
 );
+
+-- Task-Log: Bezug pro Task auf eine App oder eine DB.
+-- Der Worker legt die Spalten bei Bedarf selbst an (ensureTaskColumns in src/worker.js)
+-- und übernimmt bestehende Tasks als App-Tasks (Target = SourceApp). Manuell:
+-- ALTER TABLE improvement_tasks ADD COLUMN TargetType TEXT;  -- 'app' | 'db'
+-- ALTER TABLE improvement_tasks ADD COLUMN Target TEXT;      -- Name der App bzw. DB
+-- UPDATE improvement_tasks SET TargetType = 'app', Target = SourceApp WHERE TargetType IS NULL;
+-- CREATE INDEX IF NOT EXISTS idx_tasks_target ON improvement_tasks(TargetType, Target);

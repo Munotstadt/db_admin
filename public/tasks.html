@@ -36,6 +36,12 @@
   .actions{display:flex;gap:.4rem;margin-top:.6rem;}
   .actions button{font-size:.78rem;padding:.3rem .6rem;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;}
   .actions button:hover{border-color:var(--red);color:var(--red);}
+  .badge.target{background:#eef1f6;color:#1a1a1a;text-transform:none;}
+  .badge.target b{color:var(--red);font-weight:500;margin-right:.25rem;}
+  .seg{display:flex;gap:.4rem;}
+  .seg label{flex:1;display:flex;align-items:center;justify-content:center;gap:.35rem;padding:.45rem;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:.85rem;margin:0;color:#1a1a1a;}
+  .seg input{margin:0;}
+  .seg label:has(input:checked){border-color:var(--red);color:var(--red);}
   #status{font-size:.85rem;color:var(--muted);margin-bottom:1rem;}
 </style>
 </head>
@@ -59,7 +65,15 @@
         <option value="in_progress">In Arbeit</option>
         <option value="done">Erledigt</option>
       </select>
-      <input id="filterApp" placeholder="Nach App filtern…" style="flex:1;min-width:150px;">
+      <select id="filterType" title="Bezug">
+        <option value="">App &amp; DB</option>
+        <option value="app">Nur Apps</option>
+        <option value="db">Nur DBs</option>
+      </select>
+      <select id="filterTarget" title="App / DB">
+        <option value="">Alle Apps/DBs</option>
+      </select>
+      <input id="filterText" placeholder="Suchen (Titel, Notiz, Quelle)…" style="flex:1;min-width:150px;">
       <button id="refreshBtn" style="padding:.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;">↻ Aktualisieren</button>
       <button id="newTaskBtn" style="padding:.5rem 1rem;border-radius:6px;border:1px solid var(--red);background:var(--red);color:#fff;cursor:pointer;">+ Neuer Task</button>
     </div>
@@ -67,8 +81,14 @@
     <div id="taskOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center;">
       <div style="background:#fff;border-radius:10px;padding:1.4rem;width:min(420px,90vw);">
         <h3 id="nt-heading" style="margin:0 0 .8rem;font-family:'Space Grotesk',sans-serif;">Neuer Task</h3>
-        <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">App/Tool</label>
-        <input id="nt-app" placeholder="z.B. db_admin" style="width:100%;padding:.5rem;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;">
+        <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">Betrifft</label>
+        <div class="seg">
+          <label><input type="radio" name="nt-type" value="app" checked> App</label>
+          <label><input type="radio" name="nt-type" value="db"> DB</label>
+        </div>
+        <label id="nt-target-label" style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">App</label>
+        <input id="nt-target" list="nt-target-list" autocomplete="off" placeholder="z.B. energy" style="width:100%;padding:.5rem;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;">
+        <datalist id="nt-target-list"></datalist>
         <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">Titel</label>
         <input id="nt-title" placeholder="Kurze Zusammenfassung" style="width:100%;padding:.5rem;border:1px solid #ddd;border-radius:6px;box-sizing:border-box;">
         <label style="display:block;font-size:.8rem;color:#555;margin:.6rem 0 .2rem;">Notiz</label>
@@ -98,17 +118,52 @@
   const listEl = document.getElementById('list');
   const statusEl = document.getElementById('status');
   const filterStatus = document.getElementById('filterStatus');
-  const filterApp = document.getElementById('filterApp');
+  const filterType = document.getElementById('filterType');
+  const filterTarget = document.getElementById('filterTarget');
+  const filterText = document.getElementById('filterText');
+  const TYPE_LABEL = { app: 'App', db: 'DB' };
+  let targets = { apps: [], dbs: [] };
+
+  async function loadTargets(){
+    try {
+      const res = await fetch(`${API_BASE}/tasks/targets`, { credentials: 'include' });
+      if (res.ok) targets = await res.json();
+    } catch {}
+    fillFilterTarget();
+  }
+
+  function fillFilterTarget(){
+    const type = filterType.value;
+    const current = filterTarget.value;
+    const groups = [];
+    if (type !== 'db') groups.push(['app', 'Apps', targets.apps]);
+    if (type !== 'app') groups.push(['db', 'DBs', targets.dbs]);
+    filterTarget.innerHTML = '<option value="">' + (type === 'app' ? 'Alle Apps' : type === 'db' ? 'Alle DBs' : 'Alle Apps/DBs') + '</option>' +
+      groups.map(([t, label, names]) => names.length ? `<optgroup label="${label}">` +
+        names.map(n => `<option value="${t}:${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') + '</optgroup>' : '').join('');
+    filterTarget.value = [...filterTarget.options].some(o => o.value === current) ? current : '';
+  }
 
   async function loadTasks(){
     statusEl.textContent = 'Lade Tasks…';
     try {
       const st = filterStatus.value;
-      const res = await fetch(`${API_BASE}/tasks${st ? '?status='+st : ''}`, { credentials: 'include' });
+      const params = new URLSearchParams();
+      if (st) params.set('status', st);
+      const sel = filterTarget.value;
+      if (sel) {
+        const i = sel.indexOf(':');
+        params.set('targetType', sel.slice(0, i));
+        params.set('target', sel.slice(i + 1));
+      } else if (filterType.value) {
+        params.set('targetType', filterType.value);
+      }
+      const qs = params.toString();
+      const res = await fetch(`${API_BASE}/tasks${qs ? '?' + qs : ''}`, { credentials: 'include' });
       if (!res.ok) throw new Error('HTTP '+res.status);
       let tasks = await res.json();
-      const appFilter = filterApp.value.trim().toLowerCase();
-      if (appFilter) tasks = tasks.filter(t => t.SourceApp.toLowerCase().includes(appFilter));
+      const q = filterText.value.trim().toLowerCase();
+      if (q) tasks = tasks.filter(t => [t.Title, t.Note, t.SourceApp, t.Target].some(v => (v || '').toLowerCase().includes(q)));
       render(tasks);
       statusEl.textContent = `${tasks.length} Task(s)`;
     } catch(e) {
@@ -146,7 +201,10 @@
       div.innerHTML = `
         <div class="row1">
           <h3>${escapeHtml(t.Title)}</h3>
-          <span class="badge ${t.Status}">${t.Status}</span>
+          <span>
+            ${t.Target ? `<span class="badge target"><b>${TYPE_LABEL[t.TargetType] || 'App'}</b>${escapeHtml(t.Target)}</span>` : ''}
+            <span class="badge ${t.Status}">${t.Status}</span>
+          </span>
         </div>
         <div class="meta">${escapeHtml(t.SourceApp)}${page ? ' · ' + escapeHtml(page) : ''} · ${formatLocal(t.CreatedAt)}${t.SourceUrl ? ' · <a href="'+t.SourceUrl+'" target="_blank">Quelle</a>' : ''}</div>
         ${t.Note ? `<p class="note">${escapeHtml(t.Note)}</p>` : ''}
@@ -184,13 +242,37 @@
   const ntHeading = document.getElementById('nt-heading');
   let editingId = null; // null = neuer Task, sonst TaskID des zu bearbeitenden Tasks
 
+  const ntTarget = document.getElementById('nt-target');
+  const ntTargetList = document.getElementById('nt-target-list');
+  const ntTargetLabel = document.getElementById('nt-target-label');
+  const ntTypeRadios = [...document.querySelectorAll('input[name="nt-type"]')];
+  const getNtType = () => (ntTypeRadios.find(r => r.checked) || {}).value || 'app';
+
+  // Vorschlagsliste und Beschriftung abhängig von App/DB
+  function applyNtType(type, keepValue){
+    ntTypeRadios.forEach(r => { r.checked = r.value === type; });
+    ntTargetLabel.textContent = type === 'db' ? 'Datenbank' : 'App';
+    ntTarget.placeholder = type === 'db' ? 'z.B. db_admin' : 'z.B. energy';
+    const names = type === 'db' ? targets.dbs : targets.apps;
+    ntTargetList.innerHTML = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+    if (!keepValue) ntTarget.value = '';
+  }
+  ntTypeRadios.forEach(r => r.onchange = () => applyNtType(getNtType(), false));
+
   document.getElementById('newTaskBtn').onclick = () => {
     editingId = null;
     ntHeading.textContent = 'Neuer Task';
     taskOverlay.style.display = 'flex';
     document.getElementById('nt-status').textContent = '';
-    document.getElementById('nt-app').value = 'db_admin';
-    document.getElementById('nt-app').disabled = false;
+    // Filter-Auswahl als Vorbelegung übernehmen
+    const sel = filterTarget.value;
+    if (sel) {
+      const i = sel.indexOf(':');
+      applyNtType(sel.slice(0, i), true);
+      ntTarget.value = sel.slice(i + 1);
+    } else {
+      applyNtType(filterType.value || 'app', false);
+    }
     document.getElementById('nt-title').value = '';
     document.getElementById('nt-note').value = '';
     document.getElementById('nt-prio').value = 'normal';
@@ -201,8 +283,8 @@
     ntHeading.textContent = 'Task bearbeiten';
     taskOverlay.style.display = 'flex';
     document.getElementById('nt-status').textContent = '';
-    document.getElementById('nt-app').value = t.SourceApp;
-    document.getElementById('nt-app').disabled = true; // App/Quelle nicht nachträglich änderbar
+    applyNtType(t.TargetType || 'app', true);
+    ntTarget.value = t.Target || t.SourceApp || '';
     document.getElementById('nt-title').value = t.Title;
     document.getElementById('nt-note').value = t.Note || '';
     document.getElementById('nt-prio').value = t.Priority || 'normal';
@@ -214,6 +296,9 @@
     const note = document.getElementById('nt-note').value.trim();
     const priority = document.getElementById('nt-prio').value;
     const st = document.getElementById('nt-status');
+    const targetType = getNtType();
+    const target = ntTarget.value.trim();
+    if (!target) { st.textContent = (targetType === 'db' ? 'Datenbank' : 'App') + ' ist Pflicht.'; return; }
     if (!title) { st.textContent = 'Titel ist Pflicht.'; return; }
     st.textContent = 'Speichere…';
     try {
@@ -222,20 +307,18 @@
         res = await fetch(`${API_BASE}/tasks/${editingId}`, {
           method: 'PATCH', credentials: 'include',
           headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ title, note, priority })
+          body: JSON.stringify({ title, note, priority, targetType, target })
         });
       } else {
-        const sourceApp = document.getElementById('nt-app').value.trim();
-        if (!sourceApp) { st.textContent = 'App ist Pflicht.'; return; }
         res = await fetch(`${API_BASE}/tasks`, {
           method: 'POST', credentials: 'include',
           headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ sourceApp, sourceUrl: window.location.href, title, note, priority })
+          body: JSON.stringify({ sourceApp: 'db_admin', sourceUrl: window.location.href, title, note, priority, targetType, target })
         });
       }
       if (!res.ok) throw new Error('HTTP '+res.status);
       st.textContent = 'Gespeichert ✓';
-      setTimeout(() => { taskOverlay.style.display = 'none'; loadTasks(); }, 500);
+      setTimeout(() => { taskOverlay.style.display = 'none'; loadTargets(); loadTasks(); }, 500);
     } catch(e) {
       st.innerHTML = 'Nicht eingeloggt oder Verbindung fehlgeschlagen. ' +
         '<a href="' + API_BASE + '/tasks" target="_blank" rel="noopener">Hier einloggen</a> und danach nochmal Speichern klicken.';
@@ -244,8 +327,11 @@
 
   document.getElementById('refreshBtn').onclick = loadTasks;
   filterStatus.onchange = loadTasks;
-  filterApp.oninput = () => { clearTimeout(window._ft); window._ft = setTimeout(loadTasks, 300); };
+  filterType.onchange = () => { fillFilterTarget(); loadTasks(); };
+  filterTarget.onchange = loadTasks;
+  filterText.oninput = () => { clearTimeout(window._ft); window._ft = setTimeout(loadTasks, 300); };
 
+  loadTargets();
   loadTasks();
 </script>
   <script src="assets/improvements-button.js" data-app="db_admin"></script>
